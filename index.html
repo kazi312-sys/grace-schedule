@@ -918,9 +918,37 @@
     table.schedule { box-shadow: none; }
     .class-cell { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   }
+  /* ── Google連携 ログイン画面 ── */
+  #gsi-overlay {
+    position: fixed; inset: 0; background: var(--cream);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; text-align: center; padding: 20px;
+  }
+  #gsi-overlay .logo { font-family:'Cormorant Garamond', serif; font-size: 40px; font-weight:300; letter-spacing:.25em; color: var(--gold); margin-bottom: 6px; }
+  #gsi-overlay .sub { font-size: 12px; letter-spacing: .2em; color:#999; margin-bottom: 30px; }
+  #gsi-signin-btn {
+    padding: 13px 30px; background: var(--dark); color:#fff; border:none; border-radius: 4px;
+    font-family:'Noto Sans JP',sans-serif; font-size: 14px; letter-spacing:.1em; cursor:pointer;
+  }
+  #gsi-signin-btn:hover { opacity:.88; }
+  #gsi-status { margin-top: 16px; font-size: 12px; color:#a05050; min-height: 18px; }
+  #gsi-sync-note {
+    position: fixed; top: 8px; right: 12px; font-size: 11px; color:#999; z-index: 500;
+    background:#fff; padding: 4px 10px; border-radius: 10px; box-shadow:0 1px 4px rgba(0,0,0,.08);
+  }
 </style>
 </head>
 <body>
+
+<div id="gsi-overlay">
+  <div class="logo">GRÂCE</div>
+  <div class="sub">SCHEDULE MANAGER</div>
+  <button id="gsi-signin-btn" onclick="gsiSignIn()">🔐 Googleでログインしてスプレッドシートと同期</button>
+  <div id="gsi-status"></div>
+</div>
+<div id="gsi-sync-note" style="display:none;">🔄 スプレッドシートと同期中…</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <header>
   <div class="logo">GRÂCE</div>
@@ -1118,6 +1146,193 @@ const COLORS = {
   gray:     { label:'グレー',    bg:'#e8e8e8', fg:'#444' },
 };
 
+// ======= Googleスプレッドシート連携 設定 =======
+const GSI_CONFIG = {
+  CLIENT_ID: '481115020652-hb3k9j4jut0ighk53paupmu19cq2bdjv.apps.googleusercontent.com',
+  SPREADSHEET_ID: '1ZWkloMrpZFznB5MBdZbSvlINXhSTBGXeuDTD0fd26wU',
+  SCOPES: 'https://www.googleapis.com/auth/spreadsheets',
+};
+const SHEETS = {
+  classes:  'クラス一覧',
+  notice:   'お知らせ設定',
+  programs: 'お知らせプログラム',
+  events:   'イベントピックアップ',
+};
+
+// 表示用ラベル ⇔ 内部キー のマッピング
+const STUDIO_JA = { yakuin: '薬院', hirao: '平尾', hirao2: '平尾第二', takamiya: '高宮' };
+const STUDIO_JA_REV = Object.fromEntries(Object.entries(STUDIO_JA).map(([k, v]) => [v, k]));
+const DAY_JA_REV = { '日': 0, '月': 1, '火': 2, '水': 3, '木': 4, '金': 5, '土': 6 };
+function colorKeyToJa(k) { return (COLORS[k] && COLORS[k].label) || 'グレー'; }
+function colorJaToKey(l) {
+  const found = Object.entries(COLORS).find(([, v]) => v.label === l);
+  return found ? found[0] : 'gray';
+}
+function ynToFlag(v) { return v === 'あり' ? 'ok' : (v === 'なし' ? 'no' : ''); }
+function flagToYn(v) { return v === 'ok' ? 'あり' : (v === 'no' ? 'なし' : ''); }
+function onlineJaToFlag(v) { return v === 'あり' ? 'yes' : ''; }
+function onlineFlagToJa(v) { return v === 'yes' ? 'あり' : 'なし'; }
+function typeJaToKey(v) { return v === 'イベント' ? 'event' : 'normal'; }
+function typeKeyToJa(v) { return v === 'event' ? 'イベント' : '通常'; }
+function nameColorJaToKey(v) { return v === 'ピンク' ? 'pink' : 'purple'; }
+function nameColorKeyToJa(v) { return v === 'pink' ? 'ピンク' : 'パープル（通常）'; }
+
+let gsiAccessToken = null;
+let gsiTokenClient = null;
+
+function gsiInit() {
+  if (!window.google || !google.accounts || !google.accounts.oauth2) {
+    setTimeout(gsiInit, 300);
+    return;
+  }
+  gsiTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GSI_CONFIG.CLIENT_ID,
+    scope: GSI_CONFIG.SCOPES,
+    callback: async (resp) => {
+      if (resp.error) {
+        document.getElementById('gsi-status').textContent = 'ログインに失敗しました。もう一度お試しください。';
+        return;
+      }
+      gsiAccessToken = resp.access_token;
+      document.getElementById('gsi-overlay').style.display = 'none';
+      await gsiLoadAll();
+    },
+  });
+}
+
+function gsiSignIn() {
+  document.getElementById('gsi-status').textContent = '';
+  if (!gsiTokenClient) {
+    document.getElementById('gsi-status').textContent = '読み込み中です。数秒後にもう一度お試しください。';
+    return;
+  }
+  gsiTokenClient.requestAccessToken({ prompt: gsiAccessToken ? '' : 'consent' });
+}
+
+async function gsiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${gsiAccessToken}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  if (res.status === 401) {
+    // トークン切れ→再ログインを促す
+    document.getElementById('gsi-overlay').style.display = 'flex';
+    document.getElementById('gsi-status').textContent = 'セッションが切れました。再度ログインしてください。';
+    throw new Error('unauthorized');
+  }
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error('Sheets API error: ' + t);
+  }
+  return res.json();
+}
+
+function showSyncNote(show) {
+  document.getElementById('gsi-sync-note').style.display = show ? 'block' : 'none';
+}
+
+// ---- 読み込み ----
+async function gsiLoadAll() {
+  showSyncNote(true);
+  try {
+    const ranges = [
+      `${SHEETS.classes}!A4:K1000`,
+      `${SHEETS.notice}!A4:B5`,
+      `${SHEETS.programs}!A4:D1000`,
+      `${SHEETS.events}!A4:I1000`,
+    ].map(r => `ranges=${encodeURIComponent(r)}`).join('&');
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}/values:batchGet?${ranges}`;
+    const data = await gsiFetch(url);
+    const [classesRes, noticeRes, programsRes, eventsRes] = data.valueRanges;
+
+    classes = (classesRes.values || []).filter(r => r[0]).map(r => ({
+      studio:    STUDIO_JA_REV[r[0]] || 'yakuin',
+      day:       DAY_JA_REV[r[1]] ?? 0,
+      start:     r[2] || '10:00',
+      end:       r[3] || '11:00',
+      name:      r[4] || '',
+      teacher:   r[5] || '',
+      note:      r[6] || '',
+      color:     colorJaToKey(r[7]),
+      childcare: ynToFlag(r[8]),
+      online:    onlineJaToFlag(r[9]),
+      type:      typeJaToKey(r[10]),
+    }));
+
+    const noticeRows = noticeRes.values || [];
+    noticeData = {
+      catch:  (noticeRows[0] && noticeRows[0][1]) || '',
+      closed: (noticeRows[1] && noticeRows[1][1]) || '',
+      programs: (programsRes.values || []).filter(r => r[1]).map(r => ({
+        tag: r[0] || '', name: r[1] || '',
+        nameColor: nameColorJaToKey(r[2]), desc: r[3] || '',
+      })),
+    };
+
+    eventDetails = (eventsRes.values || []).filter(r => r[4]).map(r => ({
+      date: r[0] || '', time: r[1] || '', studio: r[2] || '', teacher: r[3] || '',
+      name: r[4] || '', desc: r[5] || '', photo: r[6] || '',
+      childcare: ynToFlag(r[7]) || (r[7] === 'あり' ? 'ok' : ''),
+      online: onlineJaToFlag(r[8]),
+    }));
+  } catch (e) {
+    console.error(e);
+    alert('スプレッドシートの読み込みに失敗しました。');
+  } finally {
+    showSyncNote(false);
+    updateMonth(); renderSchedule(); renderNotice(); renderEventCards();
+  }
+}
+
+// ---- 書き込み ----
+async function gsiClearAndWrite(sheetName, range, values) {
+  const clearUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(range)}:clear`;
+  await gsiFetch(clearUrl, { method: 'POST' });
+  if (!values.length) return;
+  const writeRange = `${sheetName}!A4`;
+  const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(writeRange)}?valueInputOption=USER_ENTERED`;
+  await gsiFetch(updateUrl, { method: 'PUT', body: JSON.stringify({ range: writeRange, values }) });
+}
+
+async function gsiSaveClasses() {
+  showSyncNote(true);
+  try {
+    const values = classes.map(c => [
+      STUDIO_JA[c.studio] || '薬院', DAYS[c.day], c.start, c.end, c.name, c.teacher, c.note,
+      colorKeyToJa(c.color), flagToYn(c.childcare), onlineFlagToJa(c.online), typeKeyToJa(c.type || 'normal'),
+    ]);
+    await gsiClearAndWrite(SHEETS.classes, `${SHEETS.classes}!A4:K1000`, values);
+  } catch (e) { console.error(e); alert('スプレッドシートへの保存に失敗しました。'); }
+  finally { showSyncNote(false); }
+}
+
+async function gsiSaveNotice() {
+  showSyncNote(true);
+  try {
+    const settingValues = [['キャッチコピー', noticeData.catch || ''], ['店休日案内', noticeData.closed || '']];
+    await gsiClearAndWrite(SHEETS.notice, `${SHEETS.notice}!A4:B5`, settingValues);
+    const programValues = (noticeData.programs || []).map(p => [p.tag || '', p.name || '', nameColorKeyToJa(p.nameColor), p.desc || '']);
+    await gsiClearAndWrite(SHEETS.programs, `${SHEETS.programs}!A4:D1000`, programValues);
+  } catch (e) { console.error(e); alert('スプレッドシートへの保存に失敗しました。'); }
+  finally { showSyncNote(false); }
+}
+
+async function gsiSaveEvents() {
+  showSyncNote(true);
+  try {
+    const values = eventDetails.map(ev => [
+      ev.date || '', ev.time || '', ev.studio || '', ev.teacher || '', ev.name || '',
+      ev.desc || '', ev.photo || '', flagToYn(ev.childcare), onlineFlagToJa(ev.online),
+    ]);
+    await gsiClearAndWrite(SHEETS.events, `${SHEETS.events}!A4:I1000`, values);
+  } catch (e) { console.error(e); alert('スプレッドシートへの保存に失敗しました。'); }
+  finally { showSyncNote(false); }
+}
+
 // 時間スロット (9:00〜21:00)
 function makeSlots() {
   const slots = [];
@@ -1157,25 +1372,9 @@ function fmtMDDay(date) {
   return `${date.getMonth()+1}/${date.getDate()}(${days[date.getDay()]})`;
 }
 
-// ローカルストレージ読み込み
-function loadData() {
-  try {
-    const saved = localStorage.getItem('grace_classes');
-    if (saved) classes = JSON.parse(saved);
-    else classes = getSampleData();
-  } catch(e) { classes = getSampleData(); }
-  try {
-    const savedNotice = localStorage.getItem('grace_notice');
-    if (savedNotice) noticeData = JSON.parse(savedNotice);
-    else noticeData = getSampleNotice();
-  } catch(e) { noticeData = getSampleNotice(); }
-}
-function saveData() {
-  localStorage.setItem('grace_classes', JSON.stringify(classes));
-}
-function saveNotice() {
-  localStorage.setItem('grace_notice', JSON.stringify(noticeData));
-}
+// データはGoogleスプレッドシートに保存されます（gsiSave* / gsiLoadAll 参照）
+function saveData() { return gsiSaveClasses(); }
+function saveNotice() { return gsiSaveNotice(); }
 
 // サンプルお知らせ
 function getSampleNotice() {
@@ -1559,8 +1758,8 @@ function updateMonth() {
 }
 
 // ======= 保存・更新 =======
-function saveAndShow() {
-  saveData();
+async function saveAndShow() {
+  await saveData();
   renderSchedule();
   switchMode('view-schedule');
 }
@@ -1722,27 +1921,19 @@ function deleteProgramBlock(i) {
   renderNoticeForm();
 }
 
-function saveNoticeAndShow() {
+async function saveNoticeAndShow() {
   noticeData.catch  = document.getElementById('ni-catch').value;
   noticeData.closed = document.getElementById('ni-closed').value;
-  saveNotice();
+  await saveNotice();
   renderNotice();
-  saveAndShow();
+  await saveAndShow();
 }
 
 // ======= イベント詳細 =======
 let eventDetails = [];
 
-function loadEventDetails() {
-  try {
-    const saved = localStorage.getItem('grace_event_details');
-    if (saved) eventDetails = JSON.parse(saved);
-    else eventDetails = getSampleEventDetails();
-  } catch(e) { eventDetails = getSampleEventDetails(); }
-}
-function saveEventDetails() {
-  localStorage.setItem('grace_event_details', JSON.stringify(eventDetails));
-}
+// データはGoogleスプレッドシートに保存されます（gsiSaveEvents / gsiLoadAll 参照）
+function saveEventDetails() { return gsiSaveEvents(); }
 
 function getSampleEventDetails() {
   return [
@@ -1936,19 +2127,18 @@ function deleteEventDetail(i) {
   renderEventDetailForm();
 }
 
-function saveEventDetailsAndShow() {
-  saveEventDetails();
+async function saveEventDetailsAndShow() {
+  await saveEventDetails();
   renderEventCards();
   switchMode('view-schedule');
 }
 
 // ======= 初期化 =======
-loadData();
-loadEventDetails();
-updateMonth();
-renderSchedule();
-renderNotice();
-renderEventCards();
+// データはGoogleログイン後、gsiLoadAll() でスプレッドシートから読み込まれます。
+classes = [];
+noticeData = { catch: '', closed: '', programs: [] };
+eventDetails = [];
+gsiInit();
 </script>
 </body>
 </html>
