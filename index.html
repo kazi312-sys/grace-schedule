@@ -1010,13 +1010,13 @@
         <thead>
           <tr>
             <th class="time-col">時間</th>
-            <th class="sun" id="th-sun">日</th>
             <th id="th-mon">月</th>
             <th id="th-tue">火</th>
             <th id="th-wed">水</th>
             <th id="th-thu">木</th>
             <th id="th-fri">金</th>
             <th class="sat" id="th-sat">土</th>
+            <th class="sun" id="th-sun">日</th>
           </tr>
         </thead>
         <tbody id="schedule-body"></tbody>
@@ -1030,8 +1030,8 @@
       <table class="month-cal">
         <thead>
           <tr>
-            <th class="sun">日</th><th>月</th><th>火</th>
-            <th>水</th><th>木</th><th>金</th><th class="sat">土</th>
+            <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th>
+            <th class="sat">土</th><th class="sun">日</th>
           </tr>
         </thead>
         <tbody id="month-body"></tbody>
@@ -1350,13 +1350,16 @@ let noticeData = { catch: '', closed: '', programs: [] };
 
 // ── カレンダーナビ ──
 let calView = 'week';           // 'week' | 'month'
-let currentWeekStart = getThisWeekSunday();   // 表示中の週の日曜
+let currentWeekStart = getThisWeekMonday();   // 表示中の週の月曜
 let currentMonthYear = { y: new Date().getFullYear(), m: new Date().getMonth() };
 
-function getThisWeekSunday() {
+// 表示上の列位置(0-6・月始まり) → 実際の曜日インデックス(0=日〜6=土)
+const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+function getThisWeekMonday() {
   const d = new Date();
   d.setHours(0,0,0,0);
-  d.setDate(d.getDate() - d.getDay()); // 日曜に合わせる
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // 月曜に合わせる
   return d;
 }
 function addDays(date, n) {
@@ -1440,7 +1443,7 @@ function moveWeek(n) {
   renderSchedule();
 }
 function goToday() {
-  currentWeekStart = getThisWeekSunday();
+  currentWeekStart = getThisWeekMonday();
   renderSchedule();
 }
 function moveMonth(n) {
@@ -1461,8 +1464,8 @@ function renderSchedule() {
   const studioClasses = classes.filter(c => c.studio === studio);
 
   // 週ヘッダーの日付を更新
-  const thIds = ['th-sun','th-mon','th-tue','th-wed','th-thu','th-fri','th-sat'];
-  const dayNames = ['日','月','火','水','木','金','土'];
+  const thIds = ['th-mon','th-tue','th-wed','th-thu','th-fri','th-sat','th-sun'];
+  const dayNames = ['月','火','水','木','金','土','日'];
   const today = new Date(); today.setHours(0,0,0,0);
   thIds.forEach((id, di) => {
     const d = addDays(currentWeekStart, di);
@@ -1508,13 +1511,14 @@ function renderSchedule() {
     tr.appendChild(tdTime);
 
     DAYS.forEach((day, di) => {
+      const actualDay = DISPLAY_ORDER[di];
       const td = document.createElement('td');
-      if (di === 0) td.classList.add('sun-col');
-      if (di === 6) td.classList.add('sat-col');
+      if (actualDay === 0) td.classList.add('sun-col');
+      if (actualDay === 6) td.classList.add('sat-col');
       const cellDate = addDays(currentWeekStart, di);
       if (cellDate.getTime() === today.getTime()) td.classList.add('today-col');
 
-      const matched = studioClasses.filter(c => c.day === di && c.start === slot);
+      const matched = studioClasses.filter(c => c.day === actualDay && c.start === slot);
       matched.forEach(cls => {
         const colInfo = COLORS[cls.color] || COLORS.gray;
         const div = document.createElement('div');
@@ -1574,26 +1578,26 @@ function renderMonthCal() {
   const firstDay = new Date(y, m, 1);
   const lastDay  = new Date(y, m+1, 0);
   const startDate = new Date(firstDay);
-  startDate.setDate(startDate.getDate() - startDate.getDay()); // 週の日曜に合わせる
+  startDate.setDate(startDate.getDate() - ((startDate.getDay() + 6) % 7)); // 週の月曜に合わせる
 
   const tbody = document.getElementById('month-body');
   tbody.innerHTML = '';
 
   let cur = new Date(startDate);
-  while (cur <= lastDay || cur.getDay() !== 0) {
+  while (cur <= lastDay || cur.getDay() !== 1) {
     const tr = document.createElement('tr');
     for (let di = 0; di < 7; di++) {
       const td = document.createElement('td');
       const isThisMonth = cur.getMonth() === m;
       const isToday = cur.getTime() === today.getTime();
       if (!isThisMonth) td.classList.add('other-month');
-      if (di === 0) td.classList.add('sun-col');
-      if (di === 6) td.classList.add('sat-col');
+      if (di === 5) td.classList.add('sat-col');
+      if (di === 6) td.classList.add('sun-col');
       if (isToday) td.classList.add('today-col');
 
       const dayOfWeek = cur.getDay();
       const dateNum = document.createElement('div');
-      dateNum.className = 'month-date-num' + (di===0?' sun':di===6?' sat':'');
+      dateNum.className = 'month-date-num' + (di===6?' sun':di===5?' sat':'');
       dateNum.textContent = cur.getDate();
       td.appendChild(dateNum);
 
@@ -1622,7 +1626,7 @@ function renderMonthCal() {
       cur = addDays(cur, 1);
     }
     tbody.appendChild(tr);
-    if (cur > lastDay && cur.getDay() === 0) break;
+    if (cur > lastDay && cur.getDay() === 1) break;
   }
 }
 
