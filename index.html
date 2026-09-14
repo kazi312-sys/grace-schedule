@@ -193,6 +193,9 @@
     position: relative;
   }
   .class-cell:hover { opacity: 0.85; }
+  .class-cell .class-name, .class-cell .class-teacher, .class-cell .class-note {
+    overflow-wrap: anywhere;
+  }
   .class-cell .class-name { font-weight: 500; font-size: 13px; }
   .class-cell .class-teacher { font-size: 11px; opacity: 0.8; margin-top: 2px; }
   .class-cell .class-note { font-size: 11px; opacity: 0.75; font-style: italic; }
@@ -329,7 +332,7 @@
   table.input-table {
     border-collapse: collapse;
     width: 100%;
-    min-width: 800px;
+    min-width: 1900px;
   }
   table.input-table th {
     background: #f5f0ea;
@@ -1785,7 +1788,17 @@ function renderSchedule() {
       if (cellDate.getTime() === today.getTime()) td.classList.add('today-col');
 
       // 5分刻みの開始時刻でも、その時刻を含む30分スロットの行に表示する
-      const matched = studioClasses.filter(c => classOccursOn(c, cellDate) && slotOf(c.start) === slot);
+      const matched = studioClasses.filter(c => classOccursOn(c, cellDate) && slotOf(c.start) === slot)
+        .sort((a, b) => String(a.start).localeCompare(String(b.start)));
+
+      // 同じ時間帯に複数クラスがある場合は横に並べる
+      let host = td;
+      if (matched.length > 1) {
+        host = document.createElement('div');
+        host.style.cssText = 'display:flex;gap:3px;align-items:stretch;';
+        td.appendChild(host);
+      }
+
       matched.forEach(cls => {
         const colInfo = COLORS[normalizeColor(cls.color)] || COLORS.lavender;
         const div = document.createElement('div');
@@ -1812,12 +1825,16 @@ function renderSchedule() {
           <div class="class-teacher" style="margin-top:2px">${cls.start}〜${cls.end}</div>
           <div style="display:flex;flex-wrap:wrap;gap:3px;">${childcareHTML}${onlineHTML}</div>
         `;
+        if (matched.length > 1) {
+          div.style.flex = '1 1 0';
+          div.style.minWidth = '0';
+        }
         if (gsiAccessToken) {
           div.style.cursor = 'pointer';
           div.title = 'クリックして編集';
-          div.onclick = () => openClassEditModal(classes.indexOf(cls));
+          div.onclick = (e) => { e.stopPropagation(); openClassEditModal(classes.indexOf(cls)); };
         }
-        td.appendChild(div);
+        host.appendChild(div);
       });
 
       // 空欄セルをクリックしたら、その曜日・時間で新規クラスを追加（管理者のみ）
@@ -1886,7 +1903,8 @@ function renderMonthCal() {
 
       // この日のクラスを表示（毎週繰り返し／単発日付に対応）
       if (isThisMonth) {
-        const dayClasses = studioClasses.filter(c => classOccursOn(c, cur));
+        const dayClasses = studioClasses.filter(c => classOccursOn(c, cur))
+          .sort((a, b) => String(a.start).localeCompare(String(b.start)));
         const maxShow = 3;
         dayClasses.slice(0, maxShow).forEach(cls => {
           const colInfo = COLORS[normalizeColor(cls.color)] || COLORS.lavender;
@@ -2238,12 +2256,12 @@ function makeSelectCell(i, field, options, val) {
 
 function makeTimeCell(i, field, val) {
   const td = document.createElement('td');
-  td.style.whiteSpace = 'nowrap';
+  td.style.cssText = 'white-space:nowrap;min-width:104px;';
   const [curH, curM] = String(val || '10:00').split(':');
 
   const selH = document.createElement('select');
   const selM = document.createElement('select');
-  const styleCss = 'padding:5px 3px;border:none;background:transparent;font-size:12px;';
+  const styleCss = 'width:44px;padding:5px 2px;border:none;background:transparent;font-size:12px;';
   selH.style.cssText = styleCss;
   selM.style.cssText = styleCss;
 
