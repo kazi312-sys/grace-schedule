@@ -1109,6 +1109,7 @@
     <button onclick="switchStudio('hirao')">平尾スタジオ</button>
     <button onclick="switchStudio('hirao2')">平尾第二スタジオ</button>
     <button onclick="switchStudio('takamiya')">高宮スタジオ</button>
+    <button onclick="switchStudio('online')">📷 オンライン配信</button>
   </div>
 
   <!-- 表示切替・週ナビ -->
@@ -1188,7 +1189,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20d</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20e</span>
     </div>
   </div>
 
@@ -1626,6 +1627,18 @@ function makeSlots() {
 const TIME_SLOTS = makeSlots();
 
 let currentStudio = 'yakuin';
+
+// 表示中のタブに応じてクラスを絞り込む
+// 'online' タブは拠点を問わず、オンライン配信ありのクラスを集める
+function classesForCurrentTab() {
+  if (currentStudio === 'online') return classes.filter(c => c.online === 'yes');
+  return classes.filter(c => c.studio === currentStudio);
+}
+
+// 表示中のタブの名前
+function currentTabLabel() {
+  return currentStudio === 'online' ? 'オンライン配信' : (STUDIOS[currentStudio] || '');
+}
 let activeColorFilters = new Set();   // 空 = すべて表示
 
 function renderColorFilterBar() {
@@ -1833,7 +1846,7 @@ function goThisMonth() {
 // ======= スケジュール描画（週表示） =======
 function renderSchedule() {
   const studio = currentStudio;
-  const studioClasses = applyColorFilter(classes.filter(c => c.studio === studio));
+  const studioClasses = applyColorFilter(classesForCurrentTab());
 
   // 週ヘッダーの日付を更新
   const thIds = ['th-mon','th-tue','th-wed','th-thu','th-fri','th-sat','th-sun'];
@@ -1853,7 +1866,7 @@ function renderSchedule() {
   document.getElementById('week-label').textContent =
     `${fmtMD(currentWeekStart)} 〜 ${fmtMD(wEnd)}`;
   document.getElementById('print-heading').textContent =
-    `${STUDIOS[studio] || ''}　${fmtMD(currentWeekStart)} 〜 ${fmtMD(wEnd)}`;
+    `${currentTabLabel()}　${fmtMD(currentWeekStart)} 〜 ${fmtMD(wEnd)}`;
 
   // 使用時間スロット
   // 任意の時刻(5分刻み)を、表示上の30分スロットに丸める
@@ -1926,11 +1939,15 @@ function renderSchedule() {
         const childcareHTML = cls.childcare === 'ok' ? `<span class="childcare-badge childcare-ok">🍼 託児あり</span>`
                             : cls.childcare === 'no' ? `<span class="childcare-badge childcare-no">託児なし</span>` : '';
         const onlineHTML   = cls.online === 'yes' ? `<span class="online-badge">📷 配信あり</span>` : '';
+        // オンラインタブでは拠点が混ざるので、どの拠点かを表示する
+        const studioHTML = currentStudio === 'online'
+          ? `<div class="class-note">📍 ${STUDIOS[cls.studio] || ''}</div>` : '';
 
         div.innerHTML = `
           ${eventHTML}
           <div>${tagsToHTML(cls.tags)}</div>
           <div class="class-name">${cls.name}</div>
+          ${studioHTML}
           <div class="class-teacher">${cls.teacher || ''}</div>
           ${cls.note ? `<div class="class-note">${cls.note}</div>` : ''}
           <div class="class-teacher" style="margin-top:2px">${cls.start}〜${cls.end}</div>
@@ -1977,12 +1994,12 @@ function renderSchedule() {
 function renderMonthCal() {
   const { y, m } = currentMonthYear;
   const studio = currentStudio;
-  const studioClasses = applyColorFilter(classes.filter(c => c.studio === studio));
+  const studioClasses = applyColorFilter(classesForCurrentTab());
   const today = new Date(); today.setHours(0,0,0,0);
 
   // 月ナビラベル
   document.getElementById('month-nav-label').textContent = `${y}年${m+1}月`;
-  document.getElementById('print-heading').textContent = `${STUDIOS[studio] || ''}　${y}年${m+1}月`;
+  document.getElementById('print-heading').textContent = `${currentTabLabel()}　${y}年${m+1}月`;
 
   const firstDay = new Date(y, m, 1);
   const lastDay  = new Date(y, m+1, 0);
@@ -2171,12 +2188,12 @@ function cdEdit() {
 // ======= 日別スケジュール詳細 =======
 function openDayDetail(dayISO) {
   const d = new Date(dayISO + 'T00:00:00');
-  const dayClasses = applyColorFilter(classes.filter(c => c.studio === currentStudio))
+  const dayClasses = applyColorFilter(classesForCurrentTab())
     .filter(c => classOccursOn(c, d))
     .sort((a, b) => String(a.start).localeCompare(String(b.start)));
 
   document.getElementById('dd-title').textContent = fmtMDDay(d) + ' の予定';
-  document.getElementById('dd-studio').textContent = STUDIOS[currentStudio] || '';
+  document.getElementById('dd-studio').textContent = currentTabLabel();
 
   const list = document.getElementById('dd-list');
   list.innerHTML = '';
@@ -2201,6 +2218,7 @@ function openDayDetail(dayISO) {
       <div style="font-size:12px;color:#8a7a68;">${cls.start}〜${cls.end}</div>
       <div>${tagsToHTML(cls.tags)}</div>
       <div style="font-size:14px;font-weight:600;color:#3A2E28;margin:2px 0;">${cls.name || ''}</div>
+      ${currentStudio === 'online' ? `<div style="font-size:12px;color:#8a7a68;">📍 ${STUDIOS[cls.studio] || ''}</div>` : ''}
       ${cls.teacher ? `<div style="font-size:12px;color:#8a7a68;">${cls.teacher}</div>` : ''}
       ${cls.note ? `<div style="font-size:12px;color:#8a7a68;">${cls.note}</div>` : ''}
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${badges.join('')}</div>
@@ -2242,7 +2260,7 @@ function cemToggleRepeatFields() {
 // 空欄クリックから新規クラスを追加する
 function openClassAddModal(dayIdx, slot, dateISO) {
   const cls = {
-    studio: currentStudio, type: 'normal',
+    studio: (currentStudio === 'online' ? 'yakuin' : currentStudio), type: 'normal',
     repeat: dateISO ? 'once' : 'weekly', nth: '', tags: '',
     day: dayIdx, date: dateISO || '', startDate: '', endDate: '',
     start: slot, end: addMinutesToTime(slot, 60),
