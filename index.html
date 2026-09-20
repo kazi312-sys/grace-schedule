@@ -954,7 +954,7 @@
     .mode-bar, .view:not(.active), #view-data { display: none !important; }
     .studio-tabs, .action-bar, .view-mode-btns, .week-nav, #color-filter-bar { display: none !important; }
     td.addable-cell:hover::after { content: none !important; }
-    #gsi-overlay, #gsi-sync-note, #class-edit-overlay, #edit-tab-btn { display: none !important; }
+    #gsi-overlay, #gsi-sync-note, #class-edit-overlay, #day-detail-overlay, #edit-tab-btn { display: none !important; }
     header { padding: 8px 10px; }
     header .sub { display: none; }
     .view { padding: 0; }
@@ -1000,6 +1000,18 @@
   <div style="margin-top:18px;"><button onclick="closeGsiOverlay()" style="background:none;border:none;color:#999;font-size:12px;text-decoration:underline;cursor:pointer;">閉じる（スケジュール表示に戻る）</button></div>
 </div>
 <div id="gsi-sync-note" style="display:none;">🔄 スプレッドシートと同期中…</div>
+
+<!-- ===== 日別スケジュール詳細モーダル ===== -->
+<div id="day-detail-overlay" onclick="if(event.target===this)closeDayDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9997;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:10px;max-width:460px;width:100%;max-height:86vh;overflow-y:auto;padding:22px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 id="dd-title" style="margin:0;font-family:'Noto Sans JP',sans-serif;color:#3A2E28;font-size:17px;"></h3>
+      <button onclick="closeDayDetail()" style="background:none;border:none;font-size:22px;line-height:1;color:#999;cursor:pointer;">×</button>
+    </div>
+    <div id="dd-studio" style="font-size:12px;color:#999;margin-bottom:10px;"></div>
+    <div id="dd-list"></div>
+  </div>
+</div>
 
 <!-- ===== クラス編集モーダル（スケジュール表示から直接編集） ===== -->
 <div id="class-edit-overlay" onclick="if(event.target===this)closeClassEditModal(true)" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;align-items:center;justify-content:center;padding:16px;">
@@ -1152,7 +1164,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20b</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20c</span>
     </div>
   </div>
 
@@ -1937,7 +1949,7 @@ function renderMonthCal() {
           if (gsiAccessToken) {
             pill.style.cursor = 'pointer';
             pill.title = 'クリックして編集';
-            pill.onclick = () => openClassEditModal(classes.indexOf(cls));
+            pill.onclick = (e) => { e.stopPropagation(); openClassEditModal(classes.indexOf(cls)); };
           }
           td.appendChild(pill);
         });
@@ -1946,6 +1958,14 @@ function renderMonthCal() {
           more.className = 'month-more';
           more.textContent = `他 ${dayClasses.length - maxShow} 件`;
           td.appendChild(more);
+        }
+
+        // 日付セルをクリックすると、その日のスケジュールをすべて表示する
+        if (dayClasses.length > 0) {
+          const dayISO = fmtISO(cur);
+          td.style.cursor = 'pointer';
+          td.title = 'クリックしてこの日の予定をすべて見る';
+          td.onclick = () => openDayDetail(dayISO);
         }
 
         // 管理者のみ：その日に新規クラスを追加するボタン
@@ -1969,6 +1989,59 @@ function renderMonthCal() {
     tbody.appendChild(tr);
     if (cur > lastDay && cur.getDay() === 1) break;
   }
+}
+
+// ======= 日別スケジュール詳細 =======
+function openDayDetail(dayISO) {
+  const d = new Date(dayISO + 'T00:00:00');
+  const dayClasses = applyColorFilter(classes.filter(c => c.studio === currentStudio))
+    .filter(c => classOccursOn(c, d))
+    .sort((a, b) => String(a.start).localeCompare(String(b.start)));
+
+  document.getElementById('dd-title').textContent = fmtMDDay(d) + ' の予定';
+  document.getElementById('dd-studio').textContent = STUDIOS[currentStudio] || '';
+
+  const list = document.getElementById('dd-list');
+  list.innerHTML = '';
+
+  if (dayClasses.length === 0) {
+    list.innerHTML = '<div style="color:#999;font-size:13px;padding:8px 0;">この日の予定はありません。</div>';
+  }
+
+  dayClasses.forEach(cls => {
+    const colInfo = COLORS[normalizeColor(cls.color)] || COLORS.lavender;
+    const row = document.createElement('div');
+    row.style.cssText = `border-left:5px solid ${colInfo.bg};background:#fbf9f6;border-radius:5px;
+      padding:10px 12px;margin-bottom:8px;`;
+
+    const badges = [];
+    if (cls.type === 'event') badges.push('<span class="event-ribbon">★ イベント</span>');
+    if (cls.childcare === 'ok') badges.push('<span class="childcare-badge childcare-ok">🍼 託児あり</span>');
+    if (cls.childcare === 'no') badges.push('<span class="childcare-badge childcare-no">託児なし</span>');
+    if (cls.online === 'yes') badges.push('<span class="online-badge">📷 配信あり</span>');
+
+    row.innerHTML = `
+      <div style="font-size:12px;color:#8a7a68;">${cls.start}〜${cls.end}</div>
+      <div>${tagsToHTML(cls.tags)}</div>
+      <div style="font-size:14px;font-weight:600;color:#3A2E28;margin:2px 0;">${cls.name || ''}</div>
+      ${cls.teacher ? `<div style="font-size:12px;color:#8a7a68;">${cls.teacher}</div>` : ''}
+      ${cls.note ? `<div style="font-size:12px;color:#8a7a68;">${cls.note}</div>` : ''}
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${badges.join('')}</div>
+    `;
+
+    if (gsiAccessToken) {
+      row.style.cursor = 'pointer';
+      row.title = 'クリックして編集';
+      row.onclick = () => { closeDayDetail(); openClassEditModal(classes.indexOf(cls)); };
+    }
+    list.appendChild(row);
+  });
+
+  document.getElementById('day-detail-overlay').style.display = 'flex';
+}
+
+function closeDayDetail() {
+  document.getElementById('day-detail-overlay').style.display = 'none';
 }
 
 // ======= データ入力テーブル描画 =======
