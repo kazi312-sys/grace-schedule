@@ -2726,22 +2726,36 @@ function formatEventDate(dateStr) {
 function renderEventDetailForm() {
   const container = document.getElementById('event-detail-blocks');
   container.innerHTML = '';
-  eventDetails.forEach((ev, i) => renderEventDetailBlock(ev, i));
+  const targetMonth = getCurrentTargetMonth();
+  let shown = 0;
+  eventDetails.forEach((ev, i) => {
+    // 対象月のイベントだけを表示する（日付未入力のものは常に表示）
+    const evMonth = (ev.date || '').slice(0, 7);
+    if (ev.date && evMonth !== targetMonth) return;
+    shown++;
+    renderEventDetailBlock(ev, i, shown);
+  });
+  if (shown === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:14px;color:#999;font-size:13px;';
+    empty.textContent = 'この月のイベントはまだ登録されていません。「＋ イベント詳細を追加」から追加できます。';
+    container.appendChild(empty);
+  }
 }
 
-function renderEventDetailBlock(ev, i) {
+function renderEventDetailBlock(ev, i, displayNo) {
   const container = document.getElementById('event-detail-blocks');
   const div = document.createElement('div');
   div.className = 'event-detail-block';
   const previewStyle = ev.photo ? 'display:block' : 'display:none';
 
   div.innerHTML = `
-    <div class="ed-num">★ イベント ${i + 1}</div>
+    <div class="ed-num">★ イベント ${displayNo || (i + 1)}</div>
     <button class="ed-del" onclick="deleteEventDetail(${i})">削除</button>
     <div class="ed-grid">
       <div class="ed-field">
         <label>日付</label>
-        <input type="date" value="${ev.date||''}" oninput="eventDetails[${i}].date=this.value;updateEventCard(${i})">
+        <input type="date" value="${ev.date||''}" onchange="eventDetails[${i}].date=this.value;updateEventCard(${i});renderEventDetailForm()">
       </div>
       <div class="ed-field">
         <label>時間</label>
@@ -2832,7 +2846,10 @@ function loadPhotoFile(event, i) {
 }
 
 function addEventDetailBlock() {
-  eventDetails.push({ date:'', time:'', studio:'', teacher:'', name:'', desc:'', photo:'', childcare:'', online:'' });
+  // 追加したイベントは、いま編集中の対象月の1日を初期値にする
+  const m = getCurrentTargetMonth();
+  const defaultDate = m ? `${m}-01` : '';
+  eventDetails.push({ date:defaultDate, time:'', studio:'', teacher:'', name:'', desc:'', photo:'', childcare:'', online:'' });
   renderEventDetailForm();
 }
 
