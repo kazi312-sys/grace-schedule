@@ -1064,7 +1064,7 @@
 
   <!-- イベントピックアップ -->
   <div class="event-pickup-section" id="event-pickup-section" style="display:none">
-    <div class="event-pickup-title"><span>★ 今月のイベントレッスン</span></div>
+    <div class="event-pickup-title"><span>★ 今後のイベントレッスン</span></div>
     <div class="event-cards-wrap" id="event-cards-wrap"></div>
   </div>
 
@@ -1152,7 +1152,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20a</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20b</span>
     </div>
   </div>
 
@@ -2677,17 +2677,11 @@ function renderEventCards() {
   const section = document.getElementById('event-pickup-section');
   const wrap = document.getElementById('event-cards-wrap');
 
-  let monthEvents;
-  if (calView === 'week') {
-    // 週表示：表示中の週（月〜日）の範囲に実施日が入っているイベントを表示
-    const weekStartISO = fmtISO(currentWeekStart);
-    const weekEndISO = fmtISO(addDays(currentWeekStart, 6));
-    monthEvents = (eventDetails || []).filter(ev => ev.date && ev.date >= weekStartISO && ev.date <= weekEndISO);
-  } else {
-    // 月表示：表示中の月に実施日が入っているイベントを表示
-    const targetMonth = getCurrentTargetMonth();
-    monthEvents = (eventDetails || []).filter(ev => (ev.date || '').slice(0, 7) === targetMonth);
-  }
+  // 週表示・月表示にかかわらず、今日以降のイベントをすべて日付順に表示する
+  const todayISO = fmtISO(new Date());
+  const monthEvents = (eventDetails || [])
+    .filter(ev => ev.date && ev.date >= todayISO)
+    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
 
   if (monthEvents.length === 0) {
     section.style.display = 'none';
