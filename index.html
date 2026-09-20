@@ -941,6 +941,37 @@
     .form-section { padding: 14px; }
   }
 
+  /* 管理メニュー（データ入力タブ内のサブタブ） */
+  .data-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+  .data-subnav button {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    padding: 9px 18px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: #8a7a68;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .data-subnav button:hover { border-color: var(--gold); }
+  .data-subnav button.active {
+    background: var(--dark);
+    border-color: var(--dark);
+    color: #fff;
+    font-weight: 500;
+  }
+  @media (max-width: 767px) {
+    .data-subnav button { flex: 1 1 auto; padding: 9px 10px; font-size: 12px; }
+  }
+
   /* 印刷 */
   .print-only { display: none; }
   @media print {
@@ -952,7 +983,7 @@
       color-adjust: exact !important;
     }
     .mode-bar, .view:not(.active), #view-data { display: none !important; }
-    .studio-tabs, .action-bar, .view-mode-btns, .week-nav, #color-filter-bar { display: none !important; }
+    .studio-tabs, .action-bar, .view-mode-btns, .week-nav, #color-filter-bar, .data-subnav { display: none !important; }
     td.addable-cell:hover::after { content: none !important; }
     #gsi-overlay, #gsi-sync-note, #class-edit-overlay, #day-detail-overlay, #class-detail-overlay, #edit-tab-btn { display: none !important; }
     header { padding: 8px 10px; }
@@ -1184,64 +1215,16 @@
 
 <!-- ===== データ入力 ===== -->
 <div id="view-data" class="view">
-  <div class="form-section">
-    <h3>📅 対象月の設定</h3>
-    <div class="month-selector">
-      <label>対象月：</label>
-      <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20e</span>
-    </div>
+
+  <!-- 管理メニュー -->
+  <div class="data-subnav">
+    <button id="dsub-class"  class="active" onclick="switchDataSection('class')">🗓 クラス登録</button>
+    <button id="dsub-month"  onclick="switchDataSection('month')">📢 月ごとの情報</button>
+    <button id="dsub-master" onclick="switchDataSection('master')">📝 クラス説明</button>
   </div>
 
-  <!-- クラス説明入力 -->
-  <div class="form-section">
-    <h3>📝 クラス説明（クラス名ごと）</h3>
-    <div style="font-size:12px;color:#888;margin-bottom:12px;">
-      スケジュール上のクラスをクリックすると表示される説明文です。<strong>同じクラス名なら、曜日・拠点が違っても同じ説明が使われます。</strong>
-    </div>
-    <div id="class-desc-blocks"></div>
-    <div class="action-bar" style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="saveDescriptionsAndShow()">💾 クラス説明を保存</button>
-    </div>
-  </div>
-
-  <!-- イベント詳細入力 -->
-  <div class="form-section">
-    <h3>★ イベントレッスン詳細入力</h3>
-    <div style="font-size:12px;color:#888;margin-bottom:12px;">「種別：イベント」にしたクラスの詳細情報（写真・説明文など）をここで入力すると、スケジュール上部にカード表示されます。</div>
-    <div id="event-detail-blocks"></div>
-    <button class="btn-add" onclick="addEventDetailBlock()" style="margin-top:4px;">＋ イベント詳細を追加</button>
-    <div class="action-bar" style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="saveEventDetailsAndShow()">💾 イベント詳細を保存・反映</button>
-    </div>
-  </div>
-
-  <!-- お知らせ入力 -->
-  <div class="form-section">
-    <h3>📢 月のお知らせ入力</h3>
-    <div id="notice-editing-month-banner" style="background:#3A2E28;color:#fff;padding:10px 16px;border-radius:6px;margin-bottom:14px;font-size:14px;">
-      現在編集中の月： <strong id="notice-editing-month-label">-</strong>　<span style="opacity:.7;font-size:12px;">（変更するには上部の「📅 対象月の設定」を切り替えてください）</span>
-    </div>
-    <div class="notice-input-grid">
-      <div class="notice-input-row">
-        <label>キャッチコピー</label>
-        <input type="text" id="ni-catch" placeholder="例：＼6月スタート！心と体を丁寧に調律する、2つの新プログラムがスタート／">
-      </div>
-      <div class="notice-input-row">
-        <label>店休日情報</label>
-        <input type="text" id="ni-closed" placeholder="例：高宮 6/4（木）　平尾 6/9（火）　薬院 6/15（月）17:00以降開講">
-      </div>
-    </div>
-    <div style="margin-top:14px;">
-      <div style="font-size:11px;color:#888;margin-bottom:8px;">新プログラム紹介（複数追加可）</div>
-      <div id="program-blocks"></div>
-      <button class="btn-add" onclick="addProgramBlock()" style="margin-top:8px;">＋ プログラムを追加</button>
-    </div>
-    <div class="action-bar" style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="saveNoticeAndShow()">💾 お知らせを保存・反映</button>
-    </div>
-  </div>
-
+  <!-- ① クラス登録 -->
+  <div id="dsec-class" class="data-section">
   <div class="form-section">
     <h3>✏️ クラスデータ入力</h3>
     <div class="input-table-wrap">
@@ -1281,6 +1264,74 @@
       <span class="hint">※ データはブラウザに自動保存されます</span>
     </div>
   </div>
+  </div>
+
+  <!-- ② 月ごとの情報（対象月・お知らせ・イベント） -->
+  <div id="dsec-month" class="data-section" style="display:none;">
+  <div class="form-section">
+    <h3>📅 対象月の設定</h3>
+    <div class="month-selector">
+      <label>対象月：</label>
+      <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20f</span>
+    </div>
+  </div>
+
+  <!-- お知らせ入力 -->
+  <div class="form-section">
+    <h3>📢 月のお知らせ入力</h3>
+    <div id="notice-editing-month-banner" style="background:#3A2E28;color:#fff;padding:10px 16px;border-radius:6px;margin-bottom:14px;font-size:14px;">
+      現在編集中の月： <strong id="notice-editing-month-label">-</strong>　<span style="opacity:.7;font-size:12px;">（変更するには上部の「📅 対象月の設定」を切り替えてください）</span>
+    </div>
+    <div class="notice-input-grid">
+      <div class="notice-input-row">
+        <label>キャッチコピー</label>
+        <input type="text" id="ni-catch" placeholder="例：＼6月スタート！心と体を丁寧に調律する、2つの新プログラムがスタート／">
+      </div>
+      <div class="notice-input-row">
+        <label>店休日情報</label>
+        <input type="text" id="ni-closed" placeholder="例：高宮 6/4（木）　平尾 6/9（火）　薬院 6/15（月）17:00以降開講">
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <div style="font-size:11px;color:#888;margin-bottom:8px;">新プログラム紹介（複数追加可）</div>
+      <div id="program-blocks"></div>
+      <button class="btn-add" onclick="addProgramBlock()" style="margin-top:8px;">＋ プログラムを追加</button>
+    </div>
+    <div class="action-bar" style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="saveNoticeAndShow()">💾 お知らせを保存・反映</button>
+    </div>
+  </div>
+
+  <!-- イベント詳細入力 -->
+  <div class="form-section">
+    <h3>★ イベントレッスン詳細入力</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">「種別：イベント」にしたクラスの詳細情報（写真・説明文など）をここで入力すると、スケジュール上部にカード表示されます。</div>
+    <div id="event-detail-blocks"></div>
+    <button class="btn-add" onclick="addEventDetailBlock()" style="margin-top:4px;">＋ イベント詳細を追加</button>
+    <div class="action-bar" style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="saveEventDetailsAndShow()">💾 イベント詳細を保存・反映</button>
+    </div>
+  </div>
+
+  </div>
+
+  <!-- ③ クラス説明（マスタ） -->
+  <div id="dsec-master" class="data-section" style="display:none;">
+  <!-- クラス説明入力 -->
+  <div class="form-section">
+    <h3>📝 クラス説明（クラス名ごと）</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">
+      スケジュール上のクラスをクリックすると表示される説明文です。<strong>同じクラス名なら、曜日・拠点が違っても同じ説明が使われます。</strong>
+    </div>
+    <div id="class-desc-blocks"></div>
+    <div class="action-bar" style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="saveDescriptionsAndShow()">💾 クラス説明を保存</button>
+    </div>
+  </div>
+
+  </div>
+
 </div>
 
 <script>
@@ -2744,6 +2795,20 @@ function switchMode(id) {
     b.classList.toggle('active', (i === 0 && id === 'view-schedule') || (i === 1 && id === 'view-data'));
   });
   if (id === 'view-data') { renderDataTable(); renderClassDescForm(); renderNoticeForm(); renderEventDetailForm(); }
+}
+
+// ======= 管理メニューの切り替え =======
+function switchDataSection(name) {
+  ['class', 'month', 'master'].forEach(k => {
+    const sec = document.getElementById('dsec-' + k);
+    const btn = document.getElementById('dsub-' + k);
+    if (sec) sec.style.display = (k === name) ? '' : 'none';
+    if (btn) btn.classList.toggle('active', k === name);
+  });
+  // 表示するタイミングで中身を描き直す
+  if (name === 'class')  renderDataTable();
+  if (name === 'month')  { renderNoticeForm(); renderEventDetailForm(); }
+  if (name === 'master') renderClassDescForm();
 }
 
 function switchStudio(studio) {
