@@ -954,7 +954,7 @@
     .mode-bar, .view:not(.active), #view-data { display: none !important; }
     .studio-tabs, .action-bar, .view-mode-btns, .week-nav, #color-filter-bar { display: none !important; }
     td.addable-cell:hover::after { content: none !important; }
-    #gsi-overlay, #gsi-sync-note, #class-edit-overlay, #day-detail-overlay, #edit-tab-btn { display: none !important; }
+    #gsi-overlay, #gsi-sync-note, #class-edit-overlay, #day-detail-overlay, #class-detail-overlay, #edit-tab-btn { display: none !important; }
     header { padding: 8px 10px; }
     header .sub { display: none; }
     .view { padding: 0; }
@@ -1000,6 +1000,30 @@
   <div style="margin-top:18px;"><button onclick="closeGsiOverlay()" style="background:none;border:none;color:#999;font-size:12px;text-decoration:underline;cursor:pointer;">閉じる（スケジュール表示に戻る）</button></div>
 </div>
 <div id="gsi-sync-note" style="display:none;">🔄 スプレッドシートと同期中…</div>
+
+<!-- ===== クラス詳細モーダル（一般の方も見られる） ===== -->
+<div id="class-detail-overlay" onclick="if(event.target===this)closeClassDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9997;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:10px;max-width:440px;width:100%;max-height:86vh;overflow-y:auto;">
+    <div id="cd-color-bar" style="height:7px;background:#d5c8e8;border-radius:10px 10px 0 0;"></div>
+    <div style="padding:20px 22px 22px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div id="cd-badges" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        <button onclick="closeClassDetail()" style="background:none;border:none;font-size:22px;line-height:1;color:#999;cursor:pointer;">×</button>
+      </div>
+      <h3 id="cd-name" style="margin:6px 0 4px;font-family:'Noto Sans JP',sans-serif;color:#3A2E28;font-size:19px;"></h3>
+      <div id="cd-teacher" style="font-size:13px;color:#8a7a68;margin-bottom:12px;"></div>
+
+      <div id="cd-meta" style="background:#fbf9f6;border-radius:6px;padding:12px 14px;font-size:13px;color:#3A2E28;line-height:1.9;"></div>
+
+      <div id="cd-desc" style="margin-top:14px;font-size:13px;line-height:1.8;color:#4a4038;white-space:pre-wrap;"></div>
+      <div id="cd-note" style="margin-top:10px;font-size:12px;color:#8a7a68;"></div>
+
+      <div id="cd-admin" style="margin-top:18px;text-align:right;display:none;">
+        <button onclick="cdEdit()" style="background:#3A2E28;color:#fff;border:none;padding:9px 18px;border-radius:5px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">✏️ このクラスを編集</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ===== 日別スケジュール詳細モーダル ===== -->
 <div id="day-detail-overlay" onclick="if(event.target===this)closeDayDetail()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9997;align-items:center;justify-content:center;padding:16px;">
@@ -1164,7 +1188,19 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20c</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20d</span>
+    </div>
+  </div>
+
+  <!-- クラス説明入力 -->
+  <div class="form-section">
+    <h3>📝 クラス説明（クラス名ごと）</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">
+      スケジュール上のクラスをクリックすると表示される説明文です。<strong>同じクラス名なら、曜日・拠点が違っても同じ説明が使われます。</strong>
+    </div>
+    <div id="class-desc-blocks"></div>
+    <div class="action-bar" style="margin-top:14px;">
+      <button class="btn btn-primary" onclick="saveDescriptionsAndShow()">💾 クラス説明を保存</button>
     </div>
   </div>
 
@@ -1303,7 +1339,11 @@ const SHEETS = {
   notice:   'お知らせ設定',
   programs: 'お知らせプログラム',
   events:   'イベントピックアップ',
+  descriptions: 'クラス説明',
 };
+
+// クラス名ごとの説明文（同じクラス名なら共通で使い回す）
+let classDescriptions = {};
 
 // 表示用ラベル ⇔ 内部キー のマッピング
 const STUDIO_JA = { yakuin: '薬院', hirao: '平尾', hirao2: '平尾第二', takamiya: '高宮' };
@@ -1414,7 +1454,7 @@ function showSyncNote(show) {
 }
 
 // ---- 読み込み(共通パーサー) ----
-function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows) {
+function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows, descriptionsRows) {
   classes = (classesRows || []).filter(r => r[0]).map(r => ({
     studio:    STUDIO_JA_REV[r[0]] || 'yakuin',
     day:       DAY_JA_REV[r[1]] ?? 0,
@@ -1452,6 +1492,13 @@ function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows) {
     childcare: ynToFlag(r[7]),
     online: onlineJaToFlag(r[8]),
   }));
+
+  // クラス名 → 説明文
+  classDescriptions = {};
+  (descriptionsRows || []).forEach(r => {
+    const name = (r[0] || '').trim();
+    if (name) classDescriptions[name] = r[1] || '';
+  });
 }
 
 // 「対象月」欄に入っているYYYY-MM文字列を取得
@@ -1479,7 +1526,7 @@ async function publicLoadAll() {
     const res = await fetch(PUBLIC_API_URL);
     if (!res.ok) throw new Error('public api error: ' + res.status);
     const data = await res.json();
-    applyLoadedRows(data.classesRows, data.noticeRows, data.programsRows, data.eventsRows);
+    applyLoadedRows(data.classesRows, data.noticeRows, data.programsRows, data.eventsRows, data.descriptionsRows);
   } catch (e) {
     console.error(e);
     alert('スケジュールデータの読み込みに失敗しました。時間をおいて再度お試しください。');
@@ -1497,6 +1544,37 @@ async function gsiClearAndWrite(sheetName, range, values) {
   const writeRange = `${sheetName}!A4`;
   const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(writeRange)}?valueInputOption=USER_ENTERED`;
   await gsiFetch(updateUrl, { method: 'PUT', body: JSON.stringify({ range: writeRange, values }) });
+}
+
+// シートが無ければ作成する（クラス説明シートの初回保存用）
+async function gsiEnsureSheet(sheetName) {
+  const infoUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}?fields=sheets.properties.title`;
+  const info = await gsiFetch(infoUrl);
+  const exists = (info.sheets || []).some(sh => sh.properties && sh.properties.title === sheetName);
+  if (exists) return;
+
+  const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}:batchUpdate`;
+  await gsiFetch(batchUrl, {
+    method: 'POST',
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title: sheetName } } }] }),
+  });
+  // 見出し行を入れておく
+  const headRange = `${sheetName}!A3:B3`;
+  const headUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(headRange)}?valueInputOption=USER_ENTERED`;
+  await gsiFetch(headUrl, { method: 'PUT', body: JSON.stringify({ range: headRange, values: [['クラス名', '説明文']] }) });
+}
+
+// クラス名ごとの説明文を保存する
+async function gsiSaveDescriptions() {
+  showSyncNote(true);
+  try {
+    await gsiEnsureSheet(SHEETS.descriptions);
+    const values = Object.entries(classDescriptions)
+      .filter(([name]) => name)
+      .map(([name, desc]) => [name, desc || '']);
+    await gsiClearAndWrite(SHEETS.descriptions, `${SHEETS.descriptions}!A4:B1000`, values);
+  } catch (e) { console.error(e); alert('クラス説明の保存に失敗しました。'); }
+  finally { showSyncNote(false); }
 }
 
 async function gsiSaveClasses() {
@@ -1862,11 +1940,9 @@ function renderSchedule() {
           div.style.flex = '1 1 0';
           div.style.minWidth = '0';
         }
-        if (gsiAccessToken) {
-          div.style.cursor = 'pointer';
-          div.title = 'クリックして編集';
-          div.onclick = (e) => { e.stopPropagation(); openClassEditModal(classes.indexOf(cls)); };
-        }
+        div.style.cursor = 'pointer';
+        div.title = 'クリックして詳細を見る';
+        div.onclick = (e) => { e.stopPropagation(); openClassDetail(classes.indexOf(cls)); };
         host.appendChild(div);
       });
 
@@ -1946,11 +2022,9 @@ function renderMonthCal() {
           pill.style.background = colInfo.bg;
           pill.style.color = colInfo.fg;
           pill.textContent = `${cls.start} ${cls.name}`;
-          if (gsiAccessToken) {
-            pill.style.cursor = 'pointer';
-            pill.title = 'クリックして編集';
-            pill.onclick = (e) => { e.stopPropagation(); openClassEditModal(classes.indexOf(cls)); };
-          }
+          pill.style.cursor = 'pointer';
+          pill.title = 'クリックして詳細を見る';
+          pill.onclick = (e) => { e.stopPropagation(); openClassDetail(classes.indexOf(cls)); };
           td.appendChild(pill);
         });
         if (dayClasses.length > maxShow) {
@@ -1991,6 +2065,109 @@ function renderMonthCal() {
   }
 }
 
+// ======= クラス説明の入力 =======
+function renderClassDescForm() {
+  const container = document.getElementById('class-desc-blocks');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // 登録されているクラス名を重複なく取り出す
+  const names = Array.from(new Set(
+    classes.map(c => (c.name || '').trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b, 'ja'));
+
+  if (names.length === 0) {
+    container.innerHTML = '<div style="color:#999;font-size:13px;">クラスが登録されると、ここに説明文の入力欄が出ます。</div>';
+    return;
+  }
+
+  names.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'notice-input-row';
+    row.style.marginBottom = '10px';
+
+    const label = document.createElement('label');
+    label.textContent = name;
+    label.style.cssText = 'min-width:190px;max-width:190px;font-size:12px;color:#3A2E28;word-break:break-word;';
+
+    const ta = document.createElement('textarea');
+    ta.value = classDescriptions[name] || '';
+    ta.placeholder = '例：呼吸に合わせてゆっくり動く、はじめての方にも安心のクラスです。';
+    ta.rows = 2;
+    ta.oninput = e => { classDescriptions[name] = e.target.value; };
+
+    row.appendChild(label);
+    row.appendChild(ta);
+    container.appendChild(row);
+  });
+}
+
+async function saveDescriptionsAndShow() {
+  await gsiSaveDescriptions();
+  alert('クラス説明を保存しました。');
+}
+
+// ======= クラス詳細（一般の方も見られる） =======
+let cdCurrentIndex = null;
+
+function openClassDetail(idx) {
+  const cls = classes[idx];
+  if (!cls) return;
+  cdCurrentIndex = idx;
+
+  const colInfo = COLORS[normalizeColor(cls.color)] || COLORS.lavender;
+  document.getElementById('cd-color-bar').style.background = colInfo.bg;
+
+  const badges = [];
+  if (cls.type === 'event') badges.push('<span class="event-ribbon">★ イベント</span>');
+  badges.push(tagsToHTML(cls.tags));
+  document.getElementById('cd-badges').innerHTML = badges.join('');
+
+  document.getElementById('cd-name').textContent = cls.name || '';
+  document.getElementById('cd-teacher').textContent = cls.teacher ? `講師：${cls.teacher}` : '';
+
+  const rows = [];
+  rows.push(`<div>🕒 ${cls.start}〜${cls.end}　${describeRepeat(cls)}</div>`);
+  rows.push(`<div>📍 ${STUDIOS[cls.studio] || ''}</div>`);
+  rows.push(`<div>🏃 運動量の目安：${colInfo.label}</div>`);
+  const opts = [];
+  if (cls.childcare === 'ok') opts.push('🍼 託児あり');
+  if (cls.childcare === 'no') opts.push('託児なし');
+  if (cls.online === 'yes') opts.push('📷 オンライン配信あり');
+  if (opts.length) rows.push(`<div>${opts.join('　')}</div>`);
+  document.getElementById('cd-meta').innerHTML = rows.join('');
+
+  const desc = classDescriptions[(cls.name || '').trim()] || '';
+  document.getElementById('cd-desc').textContent = desc;
+  document.getElementById('cd-note').textContent = cls.note ? `※ ${cls.note}` : '';
+
+  document.getElementById('cd-admin').style.display = gsiAccessToken ? 'block' : 'none';
+  document.getElementById('class-detail-overlay').style.display = 'flex';
+}
+
+// 繰り返し方法を日本語で説明する
+function describeRepeat(cls) {
+  const dayName = DAYS[cls.day] || '';
+  if (cls.repeat === 'once') return cls.date ? `${cls.date.replace(/-/g, '/')} のみ` : '単発';
+  if (cls.repeat === 'biweekly') return `隔週${dayName}曜`;
+  if (cls.repeat === 'nth') {
+    const ns = String(cls.nth || '').split(',').map(t => t.trim()).filter(Boolean);
+    return ns.length ? `第${ns.join('・')}${dayName}曜` : `${dayName}曜`;
+  }
+  return `毎週${dayName}曜`;
+}
+
+function closeClassDetail() {
+  cdCurrentIndex = null;
+  document.getElementById('class-detail-overlay').style.display = 'none';
+}
+
+function cdEdit() {
+  const idx = cdCurrentIndex;
+  closeClassDetail();
+  if (idx != null) openClassEditModal(idx);
+}
+
 // ======= 日別スケジュール詳細 =======
 function openDayDetail(dayISO) {
   const d = new Date(dayISO + 'T00:00:00');
@@ -2029,11 +2206,9 @@ function openDayDetail(dayISO) {
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${badges.join('')}</div>
     `;
 
-    if (gsiAccessToken) {
-      row.style.cursor = 'pointer';
-      row.title = 'クリックして編集';
-      row.onclick = () => { closeDayDetail(); openClassEditModal(classes.indexOf(cls)); };
-    }
+    row.style.cursor = 'pointer';
+    row.title = 'クリックして詳細を見る';
+    row.onclick = () => { closeDayDetail(); openClassDetail(classes.indexOf(cls)); };
     list.appendChild(row);
   });
 
@@ -2550,7 +2725,7 @@ function switchMode(id) {
   document.querySelectorAll('.mode-bar button').forEach((b, i) => {
     b.classList.toggle('active', (i === 0 && id === 'view-schedule') || (i === 1 && id === 'view-data'));
   });
-  if (id === 'view-data') { renderDataTable(); renderNoticeForm(); renderEventDetailForm(); }
+  if (id === 'view-data') { renderDataTable(); renderClassDescForm(); renderNoticeForm(); renderEventDetailForm(); }
 }
 
 function switchStudio(studio) {
