@@ -448,6 +448,24 @@
     overflow: hidden;
     margin-bottom: 10px;
   }
+  .notice-with-qr { display: flex; gap: 14px; align-items: flex-start; }
+  .notice-with-qr .notice-board { flex: 1 1 auto; min-width: 0; }
+  .notice-qr {
+    flex: 0 0 auto;
+    border: 2px solid #3a2878;
+    border-radius: 4px;
+    padding: 10px;
+    background: #fff;
+    text-align: center;
+  }
+  .notice-qr canvas, .notice-qr img { display: block; }
+  .notice-qr .qr-caption {
+    font-size: 11px; color: #3a2878; margin-top: 6px; letter-spacing: .04em;
+  }
+  @media (max-width: 767px) {
+    .notice-with-qr { flex-direction: column; }
+    .notice-qr { align-self: center; }
+  }
   .notice-board-title {
     background: #3a2878;
     color: #fff;
@@ -956,7 +974,8 @@
     tr, .class-cell { break-inside: avoid; }
     .class-cell { border: 1px solid rgba(0,0,0,.08); }
     .month-calendar-wrap { box-shadow: none; }
-    .event-pickup-section, #notice-area { break-inside: avoid; }
+    .event-pickup-section, #notice-area, .notice-qr { break-inside: avoid; }
+    .notice-with-qr { display: flex !important; }
   }
   /* ── Google連携 ログイン画面 ── */
   #gsi-overlay {
@@ -1029,6 +1048,7 @@
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <header>
   <div class="logo">GRÂCE</div>
@@ -1168,6 +1188,14 @@
       <div class="notice-input-row">
         <label>店休日情報</label>
         <input type="text" id="ni-closed" placeholder="例：高宮 6/4（木）　平尾 6/9（火）　薬院 6/15（月）17:00以降開講">
+      </div>
+      <div class="notice-input-row">
+        <label>QRコードのリンク先</label>
+        <input type="text" id="ni-qrurl" placeholder="例：https://studio-grace.flsn.jp/sys/　※空欄ならQRは表示されません">
+      </div>
+      <div class="notice-input-row">
+        <label>QRコードの説明文</label>
+        <input type="text" id="ni-qrcaption" placeholder="例：ご予約はこちら（QRの下に表示されます・任意）">
       </div>
     </div>
     <div style="margin-top:14px;">
@@ -1406,6 +1434,7 @@ function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows) {
   // 1行目=対象月(YYYY-MM), キャッチコピー, 店休日案内
   noticeByMonth = (noticeRows || []).filter(r => r[0]).map(r => ({
     month: r[0], catch: r[1] || '', closed: r[2] || '',
+    qrUrl: r[3] || '', qrCaption: r[4] || '',
   }));
   programsByMonth = (programsRows || []).filter(r => r[0] && r[2]).map(r => ({
     month: r[0], tag: r[1] || '', name: r[2] || '',
@@ -1434,6 +1463,8 @@ function refreshNoticeDataForCurrentMonth() {
   noticeData = {
     catch:  entry ? entry.catch  : '',
     closed: entry ? entry.closed : '',
+    qrUrl:     entry ? (entry.qrUrl || '')     : '',
+    qrCaption: entry ? (entry.qrCaption || '') : '',
     programs: programsByMonth.filter(p => p.month === m)
       .map(p => ({ tag: p.tag, name: p.name, nameColor: p.nameColor, desc: p.desc })),
   };
@@ -1483,8 +1514,8 @@ async function gsiSaveClasses() {
 async function gsiSaveNotice() {
   showSyncNote(true);
   try {
-    const settingValues = noticeByMonth.map(n => [n.month, n.catch || '', n.closed || '']);
-    await gsiClearAndWrite(SHEETS.notice, `${SHEETS.notice}!A4:C1000`, settingValues);
+    const settingValues = noticeByMonth.map(n => [n.month, n.catch || '', n.closed || '', n.qrUrl || '', n.qrCaption || '']);
+    await gsiClearAndWrite(SHEETS.notice, `${SHEETS.notice}!A4:E1000`, settingValues);
     const programValues = programsByMonth.map(p => [p.month, p.tag || '', p.name || '', nameColorKeyToJa(p.nameColor), p.desc || '']);
     await gsiClearAndWrite(SHEETS.programs, `${SHEETS.programs}!A4:E1000`, programValues);
   } catch (e) { console.error(e); alert('スプレッドシートへの保存に失敗しました。'); }
@@ -2488,16 +2519,53 @@ function renderNotice() {
       </div>`;
   });
 
-  area.innerHTML = `
-    <div class="notice-month-title">${monthLabel}</div>
-    ${(noticeData.catch || noticeData.closed || programsHTML) ? `
+  const hasBoard = !!(noticeData.catch || noticeData.closed || programsHTML);
+  const hasQR = !!(noticeData.qrUrl || '').trim();
+
+  const boardHTML = hasBoard ? `
     <div class="notice-board">
       <div class="notice-board-title">${mo}月のスケジュール</div>
       ${noticeData.catch ? `<div class="notice-catch">${noticeData.catch}</div>` : ''}
       ${programsHTML ? `<div class="notice-programs">${programsHTML}</div>` : ''}
       ${noticeData.closed ? `<div class="notice-closed">【店休日】${noticeData.closed}</div>` : ''}
-    </div>` : ''}
+    </div>` : '';
+
+  const qrHTML = hasQR ? `
+    <div class="notice-qr">
+      <div id="notice-qr-canvas"></div>
+      ${noticeData.qrCaption ? `<div class="qr-caption">${noticeData.qrCaption}</div>` : ''}
+    </div>` : '';
+
+  area.innerHTML = `
+    <div class="notice-month-title">${monthLabel}</div>
+    ${(hasBoard || hasQR) ? `<div class="notice-with-qr">${boardHTML}${qrHTML}</div>` : ''}
   `;
+
+  if (hasQR) renderNoticeQR(noticeData.qrUrl.trim());
+}
+
+// お知らせ欄のQRコードを描画する
+function renderNoticeQR(url) {
+  const box = document.getElementById('notice-qr-canvas');
+  if (!box) return;
+  if (typeof QRCode === 'undefined') {
+    // ライブラリ未読み込みのときは少し待って再試行
+    setTimeout(() => renderNoticeQR(url), 300);
+    return;
+  }
+  box.innerHTML = '';
+  try {
+    new QRCode(box, {
+      text: url,
+      width: 120,
+      height: 120,
+      colorDark: '#3a2878',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch (e) {
+    console.error('QRコードの生成に失敗しました', e);
+  }
 }
 
 // ======= お知らせ入力フォーム =======
@@ -2514,6 +2582,8 @@ function renderNoticeForm() {
   }
   document.getElementById('ni-catch').value  = noticeData.catch  || '';
   document.getElementById('ni-closed').value = noticeData.closed || '';
+  document.getElementById('ni-qrurl').value     = noticeData.qrUrl     || '';
+  document.getElementById('ni-qrcaption').value = noticeData.qrCaption || '';
   const container = document.getElementById('program-blocks');
   container.innerHTML = '';
   (noticeData.programs || []).forEach((p, i) => renderProgramBlock(p, i));
@@ -2564,10 +2634,13 @@ async function saveNoticeAndShow() {
   const m = getCurrentTargetMonth();
   noticeData.catch  = document.getElementById('ni-catch').value;
   noticeData.closed = document.getElementById('ni-closed').value;
+  noticeData.qrUrl     = document.getElementById('ni-qrurl').value.trim();
+  noticeData.qrCaption = document.getElementById('ni-qrcaption').value.trim();
 
   // noticeByMonth: 現在の対象月の分を置き換え（なければ追加）
   const idx = noticeByMonth.findIndex(n => n.month === m);
-  const entry = { month: m, catch: noticeData.catch, closed: noticeData.closed };
+  const entry = { month: m, catch: noticeData.catch, closed: noticeData.closed,
+                  qrUrl: noticeData.qrUrl, qrCaption: noticeData.qrCaption };
   if (idx >= 0) noticeByMonth[idx] = entry; else noticeByMonth.push(entry);
 
   // programsByMonth: 現在の対象月の分を今の内容で置き換え
