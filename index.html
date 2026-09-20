@@ -253,6 +253,7 @@
   .tag-new  { background: #e0483c; }
   .tag-osusume { background: #e08a1e; }
   .tag-ninki   { background: #c0399a; }
+  .tag-aroma   { background: #7a9a5a; }
   /* イベントのクラスセルは枠線を強調 */
   .class-cell.is-event {
     outline: 2px solid #c04060;
@@ -1011,9 +1012,7 @@
       <div style="grid-column:1/3;"><label style="font-size:12px;color:#888;">備考</label><input type="text" id="cem-note" style="width:100%;padding:6px;"></div>
       <div style="grid-column:1/3;"><label style="font-size:12px;color:#888;">タグ</label>
         <div style="display:flex;gap:14px;padding:6px 2px;">
-          <label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="cem-tag-new"> NEW</label>
-          <label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="cem-tag-osusume"> おすすめ！</label>
-          <label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="cem-tag-ninki"> 人気！</label>
+          <span id="cem-tag-boxes"></span>
         </div>
       </div>
       <div><label style="font-size:12px;color:#888;">託児</label><select id="cem-childcare" style="width:100%;padding:7px;"><option value="">-</option><option value="ok">あり</option><option value="no">なし</option></select></div>
@@ -1232,9 +1231,10 @@ const STUDIOS = {
 };
 const DAYS = ['日','月','火','水','木','金','土'];
 const TAGS = {
-  new:     { label:'NEW',     cls:'tag-new' },
-  osusume: { label:'おすすめ！', cls:'tag-osusume' },
-  ninki:   { label:'人気！',    cls:'tag-ninki' },
+  new:     { label:'NEW',          cls:'tag-new' },
+  osusume: { label:'おすすめ！',     cls:'tag-osusume' },
+  ninki:   { label:'人気！',        cls:'tag-ninki' },
+  aroma:   { label:'choice aroma', cls:'tag-aroma' },
 };
 function tagsToHTML(tagStr) {
   if (!tagStr) return '';
@@ -2028,9 +2028,11 @@ function openClassEditModal(idx, isNew) {
   document.getElementById('cem-repeat').value = cls.repeat || 'weekly';
   document.getElementById('cem-nth').value = cls.nth || '';
   const curTags = String(cls.tags || '').split(',').map(t => t.trim());
-  document.getElementById('cem-tag-new').checked = curTags.includes('new');
-  document.getElementById('cem-tag-osusume').checked = curTags.includes('osusume');
-  document.getElementById('cem-tag-ninki').checked = curTags.includes('ninki');
+  const tagBoxes = document.getElementById('cem-tag-boxes');
+  tagBoxes.innerHTML = Object.entries(TAGS).map(([key, info]) =>
+    `<label style="font-size:13px;cursor:pointer;margin-right:14px;white-space:nowrap;">` +
+    `<input type="checkbox" id="cem-tag-${key}"${curTags.includes(key) ? ' checked' : ''}> ${info.label}</label>`
+  ).join('');
   document.getElementById('cem-date').value = cls.date || '';
   document.getElementById('cem-startdate').value = cls.startDate || '';
   document.getElementById('cem-enddate').value = cls.endDate || '';
@@ -2065,7 +2067,7 @@ async function cemSave() {
     type:      document.getElementById('cem-type').value,
     repeat:    document.getElementById('cem-repeat').value,
     nth:       document.getElementById('cem-nth').value,
-    tags:      ['new','osusume','ninki'].filter(t => document.getElementById('cem-tag-' + t).checked).join(','),
+    tags:      Object.keys(TAGS).filter(t => document.getElementById('cem-tag-' + t).checked).join(','),
     day:       Number(document.getElementById('cem-day').value),
     date:      document.getElementById('cem-date').value,
     startDate: document.getElementById('cem-startdate').value,
