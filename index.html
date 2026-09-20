@@ -1152,6 +1152,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20a</span>
     </div>
   </div>
 
@@ -1307,6 +1308,14 @@ function colorJaToKey(l) {
   };
   return legacyJa[l] || 'lavender';
 }
+// スプレッドシートから来る日付（2026/10/31 など）を YYYY-MM-DD に揃える
+function normalizeDateStr(v) {
+  const t = String(v || '').trim();
+  if (!t) return '';
+  const m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if (!m) return t;
+  return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+}
 function ynToFlag(v) { return v === 'あり' ? 'ok' : (v === 'なし' ? 'no' : ''); }
 function flagToYn(v) { return v === 'ok' ? 'あり' : (v === 'no' ? 'なし' : ''); }
 function onlineJaToFlag(v) { return v === 'あり' ? 'yes' : ''; }
@@ -1409,9 +1418,9 @@ function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows) {
     repeat:    ({ '単発':'once', '隔週':'biweekly', '第N曜日':'nth' })[r[11]] || 'weekly',
     nth:       r[15] || '',
     tags:      r[16] || '',
-    date:      r[12] || '',
-    startDate: r[13] || '',
-    endDate:   r[14] || '',
+    date:      normalizeDateStr(r[12]),
+    startDate: normalizeDateStr(r[13]),
+    endDate:   normalizeDateStr(r[14]),
   }));
 
   // お知らせ設定・お知らせプログラムは「月ごと」に保存する
@@ -1426,7 +1435,7 @@ function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows) {
   refreshNoticeDataForCurrentMonth();
 
   eventDetails = (eventsRows || []).filter(r => r[4]).map(r => ({
-    date: r[0] || '', time: r[1] || '', studio: r[2] || '', teacher: r[3] || '',
+    date: normalizeDateStr(r[0]), time: r[1] || '', studio: r[2] || '', teacher: r[3] || '',
     name: r[4] || '', desc: r[5] || '', photo: r[6] || '',
     childcare: ynToFlag(r[7]),
     online: onlineJaToFlag(r[8]),
