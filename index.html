@@ -785,6 +785,121 @@
     flex-shrink: 0;
   }
 
+  /* ── 管理：カード一覧型エディタ ── */
+  .adm-card-list { display: flex; flex-direction: column; gap: 8px; }
+  .adm-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .adm-card.open { border-color: var(--gold); box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+  .adm-card.event.open { border-color: #c04060; }
+  .adm-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    background: #fdfaf5;
+  }
+  .adm-card.event .adm-card-head { background: #fff8fa; }
+  .adm-card.open .adm-card-head { border-bottom: 1px solid var(--border); }
+  .adm-thumb {
+    width: 44px; height: 44px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #faf7f2 no-repeat center top;
+    background-size: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #ddd;
+  }
+  .adm-card-main { flex: 1; min-width: 0; }
+  .adm-card-sub {
+    font-size: 11px;
+    color: #a08c78;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .adm-card.event .adm-card-sub { color: #c07a90; }
+  .adm-card-title {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 1px;
+    min-width: 0;
+  }
+  .adm-card-title > span:first-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .adm-card-title > span:last-child { flex-shrink: 0; }
+  .adm-card-title .muted { color: #bbb; font-weight: 400; }
+  .adm-dirty {
+    display: inline-block;
+    font-size: 10px;
+    color: #b06000;
+    background: #fff2dc;
+    border: 1px solid #f0d8a8;
+    border-radius: 3px;
+    padding: 0 6px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+  .adm-card-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .adm-mini-btn {
+    background: #fff;
+    border: 1px solid var(--border);
+    color: #777;
+    border-radius: 4px;
+    padding: 5px 11px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    white-space: nowrap;
+  }
+  .adm-mini-btn:hover { border-color: var(--gold); color: var(--text); }
+  .adm-mini-btn.del { border-color: #e8bcbc; color: #c04040; }
+  .adm-mini-btn.del:hover { border-color: #c04040; }
+  .adm-chev { font-size: 10px; color: #c8bcae; width: 12px; text-align: center; flex-shrink: 0; }
+  .adm-card-body { padding: 14px 16px 16px; }
+  .adm-save-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+  }
+  .adm-saved-note { font-size: 12px; color: #2a8060; opacity: 0; transition: opacity .2s; }
+  .adm-saved-note.show { opacity: 1; }
+  .adm-empty {
+    padding: 18px;
+    color: #aaa;
+    font-size: 13px;
+    text-align: center;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+  @media (max-width: 640px) {
+    .adm-card-head { padding: 9px 10px; gap: 8px; }
+    .adm-card-title { font-size: 13px; }
+    .adm-mini-btn { padding: 5px 8px; }
+    .adm-card-body { padding: 12px 12px 14px; }
+  }
+
   /* ── 表示モード切替・週ナビ ── */
   .view-controls {
     display: flex;
@@ -1273,7 +1388,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-20f</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-09-21a</span>
     </div>
   </div>
 
@@ -1293,24 +1408,27 @@
         <input type="text" id="ni-closed" placeholder="例：高宮 6/4（木）　平尾 6/9（火）　薬院 6/15（月）17:00以降開講">
       </div>
     </div>
-    <div style="margin-top:14px;">
-      <div style="font-size:11px;color:#888;margin-bottom:8px;">新プログラム紹介（複数追加可）</div>
-      <div id="program-blocks"></div>
-      <button class="btn-add" onclick="addProgramBlock()" style="margin-top:8px;">＋ プログラムを追加</button>
-    </div>
     <div class="action-bar" style="margin-top:14px;">
       <button class="btn btn-primary" onclick="saveNoticeAndShow()">💾 お知らせを保存・反映</button>
     </div>
   </div>
 
+  <!-- 新プログラム紹介 -->
+  <div class="form-section">
+    <h3>✨ 新プログラム紹介</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">カードをクリックすると入力欄が開きます。<strong>1件ずつ保存</strong>できます。</div>
+    <div id="program-blocks" class="adm-card-list"></div>
+    <button class="btn-add" onclick="addProgramBlock()">＋ プログラムを追加</button>
+  </div>
+
   <!-- イベント詳細入力 -->
   <div class="form-section">
     <h3>★ イベントレッスン詳細入力</h3>
-    <div style="font-size:12px;color:#888;margin-bottom:12px;">「種別：イベント」にしたクラスの詳細情報（写真・説明文など）をここで入力すると、スケジュール上部にカード表示されます。</div>
-    <div id="event-detail-blocks"></div>
-    <button class="btn-add" onclick="addEventDetailBlock()" style="margin-top:4px;">＋ イベント詳細を追加</button>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">「種別：イベント」にしたクラスの詳細情報（写真・説明文など）をここで入力すると、スケジュール上部にカード表示されます。カードをクリックすると入力欄が開き、<strong>1件ずつ保存</strong>できます。</div>
+    <div id="event-detail-blocks" class="adm-card-list"></div>
+    <button class="btn-add" onclick="addEventDetailBlock()">＋ イベント詳細を追加</button>
     <div class="action-bar" style="margin-top:14px;">
-      <button class="btn btn-primary" onclick="saveEventDetailsAndShow()">💾 イベント詳細を保存・反映</button>
+      <button class="btn btn-secondary" onclick="saveEventDetailsAndShow()">💾 すべて保存してスケジュールに戻る</button>
     </div>
   </div>
 
@@ -2888,6 +3006,29 @@ function drawQRInto(boxId, url) {
   }
 }
 
+// ======= 管理：カード一覧エディタ 共通ヘルパー =======
+function escHtml(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+let __admUidSeq = 0;
+function admUid(obj) {
+  if (!obj.__uid) obj.__uid = 'u' + (++__admUidSeq);
+  return obj.__uid;
+}
+const dirtyPrograms = new Set();
+const dirtyEvents = new Set();
+let openProgramUid = null;
+let openEventUid = null;
+
+function flashSaved(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2600);
+}
+
 // ======= お知らせ入力フォーム =======
 function renderNoticeForm() {
   const m = getCurrentTargetMonth();
@@ -2902,70 +3043,165 @@ function renderNoticeForm() {
   }
   document.getElementById('ni-catch').value  = noticeData.catch  || '';
   document.getElementById('ni-closed').value = noticeData.closed || '';
+  renderProgramBlocks();
+}
+
+// ---- プログラム：カード一覧 ----
+function renderProgramBlocks() {
   const container = document.getElementById('program-blocks');
+  if (!container) return;
   container.innerHTML = '';
-  (noticeData.programs || []).forEach((p, i) => renderProgramBlock(p, i));
+  const list = noticeData.programs || [];
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'adm-empty';
+    empty.textContent = 'この月のプログラムはまだ登録されていません。「＋ プログラムを追加」から追加できます。';
+    container.appendChild(empty);
+    return;
+  }
+  list.forEach((p, i) => renderProgramBlock(p, i));
+}
+
+function programSubText(p, i) {
+  return `プログラム ${i + 1}` + (p.tag ? `　${p.tag}` : '');
+}
+function programTitleHtml(p) {
+  return p.name ? escHtml(p.name) : '<span class="muted">（クラス名未入力）</span>';
 }
 
 function renderProgramBlock(p, i) {
   const container = document.getElementById('program-blocks');
+  const uid = admUid(p);
+  const isOpen = (openProgramUid === uid);
   const div = document.createElement('div');
-  div.className = 'program-input-block';
+  div.className = 'adm-card' + (isOpen ? ' open' : '');
   div.dataset.index = i;
-  div.innerHTML = `
-    <div class="prog-num">プログラム ${i + 1}</div>
-    <button class="prog-block-del" onclick="deleteProgramBlock(${i})">削除</button>
-    <div class="notice-input-row" style="margin-bottom:8px;">
-      <label>タグ（小見出し）</label>
-      <input type="text" value="${p.tag||''}" placeholder="例：【今日の私の香りを纏う】" oninput="noticeData.programs[${i}].tag=this.value">
-    </div>
-    <div class="notice-input-row" style="margin-bottom:8px;">
-      <label>クラス名</label>
-      <input type="text" value="${p.name||''}" placeholder="例：チョイスアロマヨガ" oninput="noticeData.programs[${i}].name=this.value">
-    </div>
-    <div class="notice-input-row" style="margin-bottom:8px;">
-      <label>名前の色</label>
-      <select onchange="noticeData.programs[${i}].nameColor=this.value" style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;">
-        <option value="purple" ${p.nameColor==='purple'?'selected':''}>パープル（通常）</option>
-        <option value="pink"   ${p.nameColor==='pink'  ?'selected':''}>ピンク</option>
-      </select>
-    </div>
-    <div class="notice-input-row" style="margin-bottom:8px;">
-      <label>説明文<br><span style="font-size:10px;color:#aaa">&lt;b&gt;太字&lt;/b&gt; 使用可</span></label>
-      <textarea oninput="noticeData.programs[${i}].desc=this.value">${p.desc||''}</textarea>
-    </div>
-    <div class="notice-input-row">
-      <label>QRのリンク先<br><span style="font-size:10px;color:#aaa">空欄ならQRなし</span></label>
-      <input type="text" value="${p.qrUrl||''}" placeholder="例：https://studio-grace.flsn.jp/sys/" oninput="noticeData.programs[${i}].qrUrl=this.value">
-    </div>
-  `;
+
+  const head = `
+    <div class="adm-card-head" onclick="toggleProgramBlock('${uid}')">
+      <span class="adm-chev">${isOpen ? '▼' : '▶'}</span>
+      <div class="adm-card-main">
+        <div class="adm-card-sub" id="prog-sub-${uid}">${escHtml(programSubText(p, i))}</div>
+        <div class="adm-card-title"><span id="prog-title-${uid}">${programTitleHtml(p)}</span><span id="prog-dirty-${uid}">${dirtyPrograms.has(uid) ? '<span class="adm-dirty">未保存</span>' : ''}</span></div>
+      </div>
+      <div class="adm-card-acts">
+        <button class="adm-mini-btn" onclick="event.stopPropagation();toggleProgramBlock('${uid}')">${isOpen ? '閉じる' : '編集'}</button>
+        <button class="adm-mini-btn del" onclick="event.stopPropagation();deleteProgramBlock(${i})">削除</button>
+      </div>
+    </div>`;
+
+  const body = !isOpen ? '' : `
+    <div class="adm-card-body">
+      <div class="notice-input-row" style="margin-bottom:8px;">
+        <label>タグ（小見出し）</label>
+        <input type="text" value="${escHtml(p.tag)}" placeholder="例：【今日の私の香りを纏う】" oninput="noticeData.programs[${i}].tag=this.value;markProgramDirty(${i})">
+      </div>
+      <div class="notice-input-row" style="margin-bottom:8px;">
+        <label>クラス名</label>
+        <input type="text" value="${escHtml(p.name)}" placeholder="例：チョイスアロマヨガ" oninput="noticeData.programs[${i}].name=this.value;markProgramDirty(${i})">
+      </div>
+      <div class="notice-input-row" style="margin-bottom:8px;">
+        <label>名前の色</label>
+        <select onchange="noticeData.programs[${i}].nameColor=this.value;markProgramDirty(${i})" style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;">
+          <option value="purple" ${p.nameColor==='purple'?'selected':''}>パープル（通常）</option>
+          <option value="pink"   ${p.nameColor==='pink'  ?'selected':''}>ピンク</option>
+        </select>
+      </div>
+      <div class="notice-input-row" style="margin-bottom:8px;">
+        <label>説明文<br><span style="font-size:10px;color:#aaa">&lt;b&gt;太字&lt;/b&gt; 使用可</span></label>
+        <textarea oninput="noticeData.programs[${i}].desc=this.value;markProgramDirty(${i})">${escHtml(p.desc)}</textarea>
+      </div>
+      <div class="notice-input-row">
+        <label>QRのリンク先<br><span style="font-size:10px;color:#aaa">空欄ならQRなし</span></label>
+        <input type="text" value="${escHtml(p.qrUrl)}" placeholder="例：https://studio-grace.flsn.jp/sys/" oninput="noticeData.programs[${i}].qrUrl=this.value;markProgramDirty(${i})">
+      </div>
+      <div class="adm-save-bar">
+        <button class="btn btn-primary" onclick="saveOneProgram(${i})">💾 このプログラムを保存</button>
+        <button class="btn btn-secondary" onclick="toggleProgramBlock('${uid}')">閉じる</button>
+        <span class="adm-saved-note" id="prog-saved-${uid}">✓ 保存しました</span>
+      </div>
+    </div>`;
+
+  div.innerHTML = head + body;
   container.appendChild(div);
 }
 
-function addProgramBlock() {
-  noticeData.programs.push({ tag:'', name:'', nameColor:'purple', desc:'', qrUrl:'' });
-  renderNoticeForm();
+function toggleProgramBlock(uid) {
+  openProgramUid = (openProgramUid === uid) ? null : uid;
+  renderProgramBlocks();
 }
 
-function deleteProgramBlock(i) {
-  noticeData.programs.splice(i, 1);
-  renderNoticeForm();
+function refreshProgramHead(i) {
+  const p = (noticeData.programs || [])[i];
+  if (!p) return;
+  const uid = admUid(p);
+  const sub = document.getElementById(`prog-sub-${uid}`);
+  const ttl = document.getElementById(`prog-title-${uid}`);
+  const dty = document.getElementById(`prog-dirty-${uid}`);
+  if (sub) sub.textContent = programSubText(p, i);
+  if (ttl) ttl.innerHTML = programTitleHtml(p);
+  if (dty) dty.innerHTML = dirtyPrograms.has(uid) ? '<span class="adm-dirty">未保存</span>' : '';
 }
 
-async function saveNoticeAndShow() {
+function markProgramDirty(i) {
+  const p = (noticeData.programs || [])[i];
+  if (!p) return;
+  dirtyPrograms.add(admUid(p));
+  refreshProgramHead(i);
+}
+
+// この月のプログラムを programsByMonth に反映する
+function syncProgramsByMonth() {
   const m = getCurrentTargetMonth();
-  noticeData.catch  = document.getElementById('ni-catch').value;
-  noticeData.closed = document.getElementById('ni-closed').value;
-
-  // noticeByMonth: 現在の対象月の分を置き換え（なければ追加）
+  const catchEl = document.getElementById('ni-catch');
+  const closedEl = document.getElementById('ni-closed');
+  if (catchEl)  noticeData.catch  = catchEl.value;
+  if (closedEl) noticeData.closed = closedEl.value;
   const idx = noticeByMonth.findIndex(n => n.month === m);
   const entry = { month: m, catch: noticeData.catch, closed: noticeData.closed };
   if (idx >= 0) noticeByMonth[idx] = entry; else noticeByMonth.push(entry);
+  programsByMonth = programsByMonth.filter(x => x.month !== m)
+    .concat((noticeData.programs || []).map(x => ({ month: m, ...x })));
+}
 
-  // programsByMonth: 現在の対象月の分を今の内容で置き換え
-  programsByMonth = programsByMonth.filter(p => p.month !== m)
-    .concat((noticeData.programs || []).map(p => ({ month: m, ...p })));
+async function saveOneProgram(i) {
+  const p = (noticeData.programs || [])[i];
+  if (!p) return;
+  const uid = admUid(p);
+  syncProgramsByMonth();
+  await saveNotice();
+  dirtyPrograms.delete(uid);
+  refreshProgramHead(i);
+  renderNotice();
+  flashSaved(`prog-saved-${uid}`);
+}
 
+async function addProgramBlock() {
+  const p = { tag:'', name:'', nameColor:'purple', desc:'', qrUrl:'' };
+  noticeData.programs = noticeData.programs || [];
+  noticeData.programs.push(p);
+  openProgramUid = admUid(p);
+  dirtyPrograms.add(openProgramUid);
+  renderProgramBlocks();
+}
+
+async function deleteProgramBlock(i) {
+  const p = (noticeData.programs || [])[i];
+  if (!p) return;
+  if (!confirm(`「${p.name || '（クラス名未入力）'}」を削除します。よろしいですか？`)) return;
+  const uid = admUid(p);
+  if (openProgramUid === uid) openProgramUid = null;
+  dirtyPrograms.delete(uid);
+  noticeData.programs.splice(i, 1);
+  syncProgramsByMonth();
+  await saveNotice();
+  renderProgramBlocks();
+  renderNotice();
+}
+
+async function saveNoticeAndShow() {
+  syncProgramsByMonth();
+  dirtyPrograms.clear();
   await saveNotice();
   renderNotice();
   await saveAndShow();
@@ -3060,6 +3296,7 @@ function formatEventDate(dateStr) {
 
 function renderEventDetailForm() {
   const container = document.getElementById('event-detail-blocks');
+  if (!container) return;
   container.innerHTML = '';
   const targetMonth = getCurrentTargetMonth();
   let shown = 0;
@@ -3072,84 +3309,164 @@ function renderEventDetailForm() {
   });
   if (shown === 0) {
     const empty = document.createElement('div');
-    empty.style.cssText = 'padding:14px;color:#999;font-size:13px;';
+    empty.className = 'adm-empty';
     empty.textContent = 'この月のイベントはまだ登録されていません。「＋ イベント詳細を追加」から追加できます。';
     container.appendChild(empty);
   }
 }
 
+function eventSubText(ev) {
+  const parts = [];
+  parts.push(formatEventDate(ev.date) || '日付未設定');
+  if (ev.time) parts.push(ev.time);
+  parts.push(ev.studio ? `@${ev.studio}` : '@拠点未設定');
+  if (ev.teacher) parts.push(ev.teacher);
+  return parts.join('　');
+}
+function eventTitleHtml(ev) {
+  const nm = (ev.name || '').replace(/\n/g, ' ').trim();
+  return nm ? escHtml(nm) : '<span class="muted">（クラス名未入力）</span>';
+}
+
 function renderEventDetailBlock(ev, i, displayNo) {
   const container = document.getElementById('event-detail-blocks');
+  const uid = admUid(ev);
+  const isOpen = (openEventUid === uid);
   const div = document.createElement('div');
-  div.className = 'event-detail-block';
+  div.className = 'adm-card event' + (isOpen ? ' open' : '');
+  div.dataset.index = i;
   const previewStyle = ev.photo ? 'display:block' : 'display:none';
 
-  div.innerHTML = `
-    <div class="ed-num">★ イベント ${displayNo || (i + 1)}</div>
-    <button class="ed-del" onclick="deleteEventDetail(${i})">削除</button>
-    <div class="ed-grid">
-      <div class="ed-field">
-        <label>日付</label>
-        <input type="date" value="${ev.date||''}" onchange="eventDetails[${i}].date=this.value;updateEventCard(${i});renderEventDetailForm()">
+  const head = `
+    <div class="adm-card-head" onclick="toggleEventBlock('${uid}')">
+      <span class="adm-chev">${isOpen ? '▼' : '▶'}</span>
+      <div class="adm-thumb" id="ev-thumb-${uid}">${ev.photo ? '' : '👤'}</div>
+      <div class="adm-card-main">
+        <div class="adm-card-sub" id="ev-sub-${uid}">${escHtml(eventSubText(ev))}</div>
+        <div class="adm-card-title"><span id="ev-title-${uid}">${eventTitleHtml(ev)}</span><span id="ev-dirty-${uid}">${dirtyEvents.has(uid) ? '<span class="adm-dirty">未保存</span>' : ''}</span></div>
       </div>
-      <div class="ed-field">
-        <label>時間</label>
-        <input type="time" value="${ev.time||''}" oninput="eventDetails[${i}].time=this.value;updateEventCard(${i})">
+      <div class="adm-card-acts">
+        <button class="adm-mini-btn" onclick="event.stopPropagation();toggleEventBlock('${uid}')">${isOpen ? '閉じる' : '編集'}</button>
+        <button class="adm-mini-btn del" onclick="event.stopPropagation();deleteEventDetail(${i})">削除</button>
       </div>
-      <div class="ed-field">
-        <label>拠点名（表示用）</label>
-        <input type="text" value="${ev.studio||''}" placeholder="例：平尾" oninput="eventDetails[${i}].studio=this.value;updateEventCard(${i})">
-      </div>
-      <div class="ed-field">
-        <label>講師名</label>
-        <input type="text" value="${ev.teacher||''}" placeholder="例：yurika" oninput="eventDetails[${i}].teacher=this.value;updateEventCard(${i})">
-      </div>
-      <div class="ed-field full">
-        <label>クラス名</label>
-        <input type="text" value="${(ev.name||'').replace(/\n/g,' ')}" placeholder="例：眼精疲労リセット 小顔フェイシャルアロマヨガ" oninput="eventDetails[${i}].name=this.value;updateEventCard(${i})">
-      </div>
-      <div class="ed-field full">
-        <label>説明文</label>
-        <textarea oninput="eventDetails[${i}].desc=this.value;updateEventCard(${i})">${ev.desc||''}</textarea>
-      </div>
-      <div class="ed-field full">
-        <label>講師写真（画像URL、または下のボタンでファイル読み込み）</label>
-        <div class="ed-photo-row">
-          <div class="ed-photo-placeholder" id="ed-ph-${i}">👤</div>
-          <img id="ed-preview-${i}" class="ed-photo-preview ${ev.photo?'show':''}" src="${ev.photo||''}" style="${previewStyle}">
-          <div style="display:flex;flex-direction:column;gap:6px;flex:1">
-            <input type="text" value="${ev.photo||''}" placeholder="https://..." id="ed-url-${i}"
-              oninput="eventDetails[${i}].photo=this.value;refreshPhotoPreview(${i})">
-            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#3a2878;">
-              <input type="file" accept="image/*" style="display:none" onchange="loadPhotoFile(event,${i})">
-              📂 ファイルから読み込む
-            </label>
+    </div>`;
+
+  const body = !isOpen ? '' : `
+    <div class="adm-card-body">
+      <div class="ed-grid">
+        <div class="ed-field">
+          <label>日付</label>
+          <input type="date" value="${escHtml(ev.date)}" onchange="eventDetails[${i}].date=this.value;markEventDirty(${i});renderEventDetailForm()">
+        </div>
+        <div class="ed-field">
+          <label>時間</label>
+          <input type="time" value="${escHtml(ev.time)}" oninput="eventDetails[${i}].time=this.value;markEventDirty(${i})">
+        </div>
+        <div class="ed-field">
+          <label>拠点名（表示用）</label>
+          <input type="text" value="${escHtml(ev.studio)}" placeholder="例：平尾" oninput="eventDetails[${i}].studio=this.value;markEventDirty(${i})">
+        </div>
+        <div class="ed-field">
+          <label>講師名</label>
+          <input type="text" value="${escHtml(ev.teacher)}" placeholder="例：yurika" oninput="eventDetails[${i}].teacher=this.value;markEventDirty(${i})">
+        </div>
+        <div class="ed-field full">
+          <label>クラス名</label>
+          <input type="text" value="${escHtml((ev.name||'').replace(/\n/g,' '))}" placeholder="例：眼精疲労リセット 小顔フェイシャルアロマヨガ" oninput="eventDetails[${i}].name=this.value;markEventDirty(${i})">
+        </div>
+        <div class="ed-field full">
+          <label>説明文</label>
+          <textarea oninput="eventDetails[${i}].desc=this.value;markEventDirty(${i})">${escHtml(ev.desc)}</textarea>
+        </div>
+        <div class="ed-field full">
+          <label>講師写真（画像URL、または下のボタンでファイル読み込み）</label>
+          <div class="ed-photo-row">
+            <div class="ed-photo-placeholder" id="ed-ph-${i}">👤</div>
+            <img id="ed-preview-${i}" class="ed-photo-preview ${ev.photo?'show':''}" src="${escHtml(ev.photo)}" style="${previewStyle}">
+            <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+              <input type="text" value="${escHtml(ev.photo)}" placeholder="https://..." id="ed-url-${i}"
+                oninput="eventDetails[${i}].photo=this.value;refreshPhotoPreview(${i})">
+              <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#3a2878;">
+                <input type="file" accept="image/*" style="display:none" onchange="loadPhotoFile(event,${i})">
+                📂 ファイルから読み込む
+              </label>
+            </div>
           </div>
         </div>
+        <div class="ed-field">
+          <label>託児</label>
+          <select onchange="eventDetails[${i}].childcare=this.value;markEventDirty(${i})">
+            <option value="" ${!ev.childcare?'selected':''}>－</option>
+            <option value="ok" ${ev.childcare==='ok'?'selected':''}>🍼 あり</option>
+            <option value="no" ${ev.childcare==='no'?'selected':''}>なし</option>
+          </select>
+        </div>
+        <div class="ed-field">
+          <label>オンライン配信</label>
+          <select onchange="eventDetails[${i}].online=this.value;markEventDirty(${i})">
+            <option value="" ${!ev.online?'selected':''}>なし</option>
+            <option value="yes" ${ev.online==='yes'?'selected':''}>📷 あり</option>
+          </select>
+        </div>
       </div>
-      <div class="ed-field">
-        <label>託児</label>
-        <select onchange="eventDetails[${i}].childcare=this.value">
-          <option value="" ${!ev.childcare?'selected':''}>－</option>
-          <option value="ok" ${ev.childcare==='ok'?'selected':''}>🍼 あり</option>
-          <option value="no" ${ev.childcare==='no'?'selected':''}>なし</option>
-        </select>
+      <div class="adm-save-bar">
+        <button class="btn btn-primary" onclick="saveOneEvent(${i})">💾 このイベントを保存</button>
+        <button class="btn btn-secondary" onclick="toggleEventBlock('${uid}')">閉じる</button>
+        <span class="adm-saved-note" id="ev-saved-${uid}">✓ 保存しました</span>
       </div>
-      <div class="ed-field">
-        <label>オンライン配信</label>
-        <select onchange="eventDetails[${i}].online=this.value">
-          <option value="" ${!ev.online?'selected':''}>なし</option>
-          <option value="yes" ${ev.online==='yes'?'selected':''}>📷 あり</option>
-        </select>
-      </div>
-    </div>
-  `;
+    </div>`;
+
+  div.innerHTML = head + body;
   container.appendChild(div);
 
+  // サムネイル（画像がある場合）
+  const thumb = div.querySelector(`#ev-thumb-${uid}`);
+  if (thumb && ev.photo) thumb.style.backgroundImage = `url("${ev.photo}")`;
+
   // selectのstyleを適用
-  div.querySelectorAll('select').forEach(s => {
-    s.style.cssText = 'padding:7px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:Noto Sans JP,sans-serif;width:100%;';
+  div.querySelectorAll('select').forEach(sel => {
+    sel.style.cssText = 'padding:7px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:Noto Sans JP,sans-serif;width:100%;';
   });
+}
+
+function toggleEventBlock(uid) {
+  openEventUid = (openEventUid === uid) ? null : uid;
+  renderEventDetailForm();
+}
+
+function refreshEventHead(i) {
+  const ev = eventDetails[i];
+  if (!ev) return;
+  const uid = admUid(ev);
+  const sub = document.getElementById(`ev-sub-${uid}`);
+  const ttl = document.getElementById(`ev-title-${uid}`);
+  const dty = document.getElementById(`ev-dirty-${uid}`);
+  const thumb = document.getElementById(`ev-thumb-${uid}`);
+  if (sub) sub.textContent = eventSubText(ev);
+  if (ttl) ttl.innerHTML = eventTitleHtml(ev);
+  if (dty) dty.innerHTML = dirtyEvents.has(uid) ? '<span class="adm-dirty">未保存</span>' : '';
+  if (thumb) {
+    if (ev.photo) { thumb.style.backgroundImage = `url("${ev.photo}")`; thumb.textContent = ''; }
+    else { thumb.style.backgroundImage = ''; thumb.textContent = '👤'; }
+  }
+}
+
+function markEventDirty(i) {
+  const ev = eventDetails[i];
+  if (!ev) return;
+  dirtyEvents.add(admUid(ev));
+  refreshEventHead(i);
+}
+
+async function saveOneEvent(i) {
+  const ev = eventDetails[i];
+  if (!ev) return;
+  const uid = admUid(ev);
+  await saveEventDetails();
+  dirtyEvents.delete(uid);
+  refreshEventHead(i);
+  renderEventCards();
+  flashSaved(`ev-saved-${uid}`);
 }
 
 function updateEventCard(i) { /* リアルタイム更新は保存時に */ }
@@ -3157,6 +3474,7 @@ function updateEventCard(i) { /* リアルタイム更新は保存時に */ }
 function refreshPhotoPreview(i) {
   const url = document.getElementById(`ed-url-${i}`)?.value || '';
   eventDetails[i].photo = url;
+  markEventDirty(i);
   const preview = document.getElementById(`ed-preview-${i}`);
   const placeholder = document.getElementById(`ed-ph-${i}`);
   if (preview) {
@@ -3176,6 +3494,7 @@ function loadPhotoFile(event, i) {
     const preview = document.getElementById(`ed-preview-${i}`);
     const placeholder = document.getElementById(`ed-ph-${i}`);
     if (preview) { preview.src = e.target.result; preview.style.display='block'; if(placeholder) placeholder.style.display='none'; }
+    markEventDirty(i);
   };
   reader.readAsDataURL(file);
 }
@@ -3184,16 +3503,29 @@ function addEventDetailBlock() {
   // 追加したイベントは、いま編集中の対象月の1日を初期値にする
   const m = getCurrentTargetMonth();
   const defaultDate = m ? `${m}-01` : '';
-  eventDetails.push({ date:defaultDate, time:'', studio:'', teacher:'', name:'', desc:'', photo:'', childcare:'', online:'' });
+  const ev = { date:defaultDate, time:'', studio:'', teacher:'', name:'', desc:'', photo:'', childcare:'', online:'' };
+  eventDetails.push(ev);
+  openEventUid = admUid(ev);
+  dirtyEvents.add(openEventUid);
   renderEventDetailForm();
 }
 
-function deleteEventDetail(i) {
+async function deleteEventDetail(i) {
+  const ev = eventDetails[i];
+  if (!ev) return;
+  const nm = (ev.name || '').replace(/\n/g, ' ').trim() || '（クラス名未入力）';
+  if (!confirm(`「${nm}」を削除します。よろしいですか？`)) return;
+  const uid = admUid(ev);
+  if (openEventUid === uid) openEventUid = null;
+  dirtyEvents.delete(uid);
   eventDetails.splice(i, 1);
+  await saveEventDetails();
   renderEventDetailForm();
+  renderEventCards();
 }
 
 async function saveEventDetailsAndShow() {
+  dirtyEvents.clear();
   await saveEventDetails();
   renderEventCards();
   switchMode('view-schedule');
