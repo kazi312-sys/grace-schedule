@@ -1295,7 +1295,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-02c</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-02d</span>
     </div>
   </div>
 
@@ -1968,13 +1968,23 @@ function renderSchedule() {
     if (isNaN(h)) return '';
     return `${String(h).padStart(2,'0')}:${m >= 30 ? '30' : '00'}`;
   }
+  // 時刻を分に変換（文字列比較だと "10:00" < "9:45" のように誤判定するため）
+  function timeToMin(t) {
+    const [h, m] = String(t || '').split(':').map(Number);
+    return isNaN(h) ? NaN : h * 60 + (m || 0);
+  }
   // 表示中の週に実際に開催されるクラスだけを見て、使われている時間帯を調べる
   const usedSlots = new Set();
   for (let di = 0; di < 7; di++) {
     const d = addDays(currentWeekStart, di);
     studioClasses.filter(c => classOccursOn(c, d)).forEach(c => {
       TIME_SLOTS.forEach(slot => {
-        if (slot >= slotOf(c.start) && slot < c.end) usedSlots.add(slot);
+        const sMin = timeToMin(slot);
+        const startMin = timeToMin(slotOf(c.start));
+        const endMin = timeToMin(c.end);
+        if (!isNaN(sMin) && !isNaN(startMin) && !isNaN(endMin) && sMin >= startMin && sMin < endMin) {
+          usedSlots.add(slot);
+        }
       });
     });
   }
