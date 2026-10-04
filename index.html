@@ -203,6 +203,17 @@
   .class-cell .class-name { font-weight: 500; font-size: 13px; }
   .class-cell .class-teacher { font-size: 11px; opacity: 0.8; margin-top: 2px; }
   .class-cell .class-note { font-size: 11px; opacity: 0.75; font-style: italic; }
+  .class-cell .class-time {
+    display: inline-block;
+    margin-top: 3px;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.78);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    opacity: 1;
+  }
   .childcare-badge {
     display: inline-block;
     font-size: 11px;
@@ -929,6 +940,7 @@
     table.schedule td.time-cell { font-size: 12px; }
     .class-cell .class-name { font-size: 12px; }
     .class-cell .class-teacher { font-size: 11px; }
+    .class-cell .class-time { font-size: 11px; padding: 1px 5px; }
     .childcare-badge { font-size: 10px; }
     /* お知らせ：縦積みに */
     .notice-program-row { flex-direction: column; }
@@ -1295,7 +1307,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-02d</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-02e</span>
     </div>
   </div>
 
@@ -2059,7 +2071,7 @@ function renderSchedule() {
           ${studioHTML}
           <div class="class-teacher">${cls.teacher || ''}</div>
           ${cls.note ? `<div class="class-note">${cls.note}</div>` : ''}
-          <div class="class-teacher" style="margin-top:2px">${cls.start}〜${cls.end}</div>
+          <div class="class-time">${cls.start}〜${cls.end}</div>
           <div style="display:flex;flex-wrap:wrap;gap:3px;">${childcareHTML}${onlineHTML}</div>
         `;
         if (matched.length > 1) {
@@ -2338,7 +2350,7 @@ function openDayDetail(dayISO) {
     if (cls.online === 'yes') badges.push('<span class="online-badge">📷 配信あり</span>');
 
     row.innerHTML = `
-      <div style="font-size:12px;color:#8a7a68;">${cls.start}〜${cls.end}</div>
+      <div style="font-size:13px;font-weight:700;color:#3A2E28;">${cls.start}〜${cls.end}</div>
       <div>${tagsToHTML(cls.tags)}</div>
       <div style="font-size:14px;font-weight:600;color:#3A2E28;margin:2px 0;">${cls.name || ''}</div>
       ${currentStudio === 'online' ? `<div style="font-size:12px;color:#8a7a68;">📍 ${STUDIOS[cls.studio] || ''}</div>` : ''}
