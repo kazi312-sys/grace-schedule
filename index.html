@@ -1474,7 +1474,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-06c</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-06d</span>
     </div>
   </div>
 
@@ -1719,6 +1719,28 @@ function showSyncNote(show) {
 }
 
 // ---- 読み込み(共通パーサー) ----
+// ===== データ保護 =====
+// 最初の読み込みが成功するまでは、いっさい保存させない（空データでシートを消さないため）
+let initialLoadOk = false;
+// 読み込んだ直後の件数。保存時にこれより大きく減っていたら確認する
+const loadedCounts = { classes: 0, events: 0, programs: 0, descriptions: 0 };
+
+// 保存してよいかを判定する。だめなら false を返す
+function guardSave(label, key, nextCount) {
+  if (!initialLoadOk) {
+    alert(`データの読み込みが終わっていないため、${label}の保存を中止しました。\n\nページを再読み込みして、スケジュールが表示されてから操作してください。`);
+    return false;
+  }
+  const before = loadedCounts[key] || 0;
+  if (before > 0 && nextCount === 0) {
+    return confirm(`⚠️ ${label}を「0件」で上書きしようとしています。\n\nスプレッドシートに残っている ${before} 件はすべて消えます。\n本当によろしいですか？`);
+  }
+  if (before >= 3 && nextCount < before / 2) {
+    return confirm(`⚠️ ${label}が ${before} 件 → ${nextCount} 件に大きく減ります。\n\n読み込み不足の可能性があります。本当に保存しますか？`);
+  }
+  return true;
+}
+
 function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows, descriptionsRows) {
   classes = (classesRows || []).filter(r => r[0]).map(r => ({
     studio:    STUDIO_JA_REV[r[0]] || 'yakuin',
@@ -1765,6 +1787,13 @@ function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows, desc
     const name = (r[0] || '').trim();
     if (name) classDescriptions[name] = r[1] || '';
   });
+
+  // 読み込み成功。ここで初めて保存を許可する
+  loadedCounts.classes      = classes.length;
+  loadedCounts.events       = eventDetails.length;
+  loadedCounts.programs     = programsByMonth.length;
+  loadedCounts.descriptions = Object.keys(classDescriptions).length;
+  initialLoadOk = true;
 }
 
 // 「対象月」欄に入っているYYYY-MM文字列を取得
@@ -1832,6 +1861,7 @@ async function gsiEnsureSheet(sheetName) {
 
 // クラス名ごとの説明文を保存する
 async function gsiSaveDescriptions() {
+  if (!guardSave('クラス説明', 'descriptions', Object.keys(classDescriptions).length)) return;
   showSyncNote(true);
   try {
     await gsiEnsureSheet(SHEETS.descriptions);
@@ -1844,6 +1874,7 @@ async function gsiSaveDescriptions() {
 }
 
 async function gsiSaveClasses() {
+  if (!guardSave('クラスデータ', 'classes', classes.length)) return;
   showSyncNote(true);
   try {
     const values = classes.map(c => [
@@ -1853,22 +1884,26 @@ async function gsiSaveClasses() {
       (c.date || ''), (c.startDate || ''), (c.endDate || ''), (c.nth || ''), (c.tags || ''), (c.exceptions || ''),
     ]);
     await gsiClearAndWrite(SHEETS.classes, `${SHEETS.classes}!A4:R1000`, values);
+    loadedCounts.classes = classes.length;
   } catch (e) { console.error(e); alert('スプレッドシートへの保存に失敗しました。'); }
   finally { showSyncNote(false); }
 }
 
 async function gsiSaveNotice() {
+  if (!guardSave('お知らせ・プログラム', 'programs', programsByMonth.length)) return;
   showSyncNote(true);
   try {
     const settingValues = noticeByMonth.map(n => [n.month, n.catch || '', n.closed || '']);
     await gsiClearAndWrite(SHEETS.notice, `${SHEETS.notice}!A4:C1000`, settingValues);
     const programValues = programsByMonth.map(p => [p.month, p.tag || '', p.name || '', nameColorKeyToJa(p.nameColor), p.desc || '', p.qrUrl || '']);
     await gsiClearAndWrite(SHEETS.programs, `${SHEETS.programs}!A4:F1000`, programValues);
+    loadedCounts.programs = programsByMonth.length;
   } catch (e) { console.error(e); alert('スプレッドシートへの保存に失敗しました。'); }
   finally { showSyncNote(false); }
 }
 
 async function gsiSaveEvents() {
+  if (!guardSave('イベント詳細', 'events', eventDetails.length)) return;
   showSyncNote(true);
   try {
     const values = eventDetails.map(ev => [
@@ -1876,6 +1911,7 @@ async function gsiSaveEvents() {
       ev.desc || '', ev.photo || '', flagToYn(ev.childcare), onlineFlagToJa(ev.online),
     ]);
     await gsiClearAndWrite(SHEETS.events, `${SHEETS.events}!A4:I1000`, values);
+    loadedCounts.events = eventDetails.length;
   } catch (e) { console.error(e); alert('スプレッドシートへの保存に失敗しました。'); }
   finally { showSyncNote(false); }
 }
