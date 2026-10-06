@@ -1183,11 +1183,11 @@
   </div>
 
   <div class="studio-tabs">
-    <button class="active" onclick="switchStudio('yakuin')">薬院スタジオ</button>
-    <button onclick="switchStudio('hirao')">平尾スタジオ</button>
-    <button onclick="switchStudio('hirao2')">平尾（アクシオム）</button>
-    <button onclick="switchStudio('takamiya')">高宮スタジオ</button>
-    <button onclick="switchStudio('online')">📷 オンライン配信</button>
+    <button class="active" data-studio="yakuin" onclick="switchStudio('yakuin')">薬院スタジオ</button>
+    <button data-studio="hirao" onclick="switchStudio('hirao')">平尾スタジオ</button>
+    <button data-studio="hirao2" onclick="switchStudio('hirao2')">平尾（アクシオム）</button>
+    <button data-studio="takamiya" onclick="switchStudio('takamiya')">高宮スタジオ</button>
+    <button data-studio="online" onclick="switchStudio('online')">📷 オンライン配信</button>
   </div>
 
   <!-- 表示切替・週ナビ -->
@@ -1320,7 +1320,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-06a</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-06b</span>
     </div>
   </div>
 
@@ -3010,10 +3010,34 @@ function switchDataSection(name) {
 
 function switchStudio(studio) {
   currentStudio = studio;
-  document.querySelectorAll('.studio-tabs button').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  highlightStudioTab(studio);
   if (calView === 'week') renderSchedule();
   else renderMonthCal();
+}
+
+// 拠点タブの選択状態を更新する
+function highlightStudioTab(studio) {
+  document.querySelectorAll('.studio-tabs button').forEach(b =>
+    b.classList.toggle('active', b.dataset.studio === studio));
+}
+
+// URLの ?studio=... で、最初に開く拠点タブを指定できる
+// 例： ?studio=axiom → 平尾（アクシオム）
+const STUDIO_URL_ALIAS = {
+  axiom: 'hirao2', hirao2: 'hirao2', 'アクシオム': 'hirao2', '平尾（アクシオム）': 'hirao2', '平尾(アクシオム)': 'hirao2',
+  yakuin: 'yakuin', '薬院': 'yakuin',
+  hirao: 'hirao', '平尾': 'hirao',
+  takamiya: 'takamiya', '高宮': 'takamiya',
+  online: 'online', 'オンライン': 'online', 'オンライン配信': 'online',
+};
+function initStudioFromUrl() {
+  const q = new URLSearchParams(location.search);
+  const raw = (q.get('studio') || q.get('s') || '').trim();
+  if (!raw) return;
+  const key = STUDIO_URL_ALIAS[raw.toLowerCase()] || STUDIO_URL_ALIAS[raw];
+  if (!key) return;
+  currentStudio = key;
+  highlightStudioTab(key);
 }
 
 // ======= お知らせ描画 =======
@@ -3414,6 +3438,7 @@ classes = [];
 noticeData = { catch: '', closed: '', programs: [] };
 eventDetails = [];
 gsiInit();
+initStudioFromUrl();
 renderColorFilterBar();
 publicLoadAll();
 </script>
