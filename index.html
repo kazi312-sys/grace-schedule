@@ -603,6 +603,47 @@
     cursor: pointer;
   }
 
+  /* ── 編集ブロックの開閉（既定は閉じた状態） ── */
+  .blk-head {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 90px 2px 0;   /* 右の「削除」ボタンに重ならないように */
+  }
+  .blk-head:hover { opacity: .75; }
+  .blk-arrow {
+    display: inline-block;
+    width: 1em;
+    font-size: 11px;
+  }
+  .blk-summary {
+    color: #555;
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .blk-summary.empty { color: #bbb; font-weight: 400; }
+  .blk-body { margin-top: 10px; }
+  .blk-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .blk-toolbar button {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: #777;
+    cursor: pointer;
+  }
+  .blk-toolbar button:hover { background: #f5f0e8; }
+
   /* ── イベントピックアップカード ── */
   .event-pickup-section {
     margin-bottom: 20px;
@@ -1307,7 +1348,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-07a</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-07c</span>
     </div>
   </div>
 
@@ -1320,11 +1361,11 @@
     <div class="notice-input-grid">
       <div class="notice-input-row">
         <label>キャッチコピー</label>
-        <input type="text" id="ni-catch" placeholder="例：＼6月スタート！心と体を丁寧に調律する、2つの新プログラムがスタート／">
+        <input type="text" id="ni-catch" oninput="noticeData.catch=this.value" placeholder="例：＼6月スタート！心と体を丁寧に調律する、2つの新プログラムがスタート／">
       </div>
       <div class="notice-input-row">
         <label>店休日情報</label>
-        <input type="text" id="ni-closed" placeholder="例：高宮 6/4（木）　平尾 6/9（火）　薬院 6/15（月）17:00以降開講">
+        <input type="text" id="ni-closed" oninput="noticeData.closed=this.value" placeholder="例：高宮 6/4（木）　平尾 6/9（火）　薬院 6/15（月）17:00以降開講">
       </div>
     </div>
     <div style="margin-top:14px;">
@@ -1544,7 +1585,21 @@ function showSyncNote(show) {
 }
 
 // ---- 読み込み(共通パーサー) ----
+// 貼り付けミスなどで紛れ込んだ見出し行を読み飛ばす
+function dropHeaderRows(rows, col1, col2) {
+  return (rows || []).filter(r =>
+    !(String(r[0] || '').trim() === col1 && String(r[1] || '').trim() === col2)
+  );
+}
+
 function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows, descriptionsRows) {
+  // データの中に見出し行が混ざっていても、クラスやイベントとして扱わないようにする
+  classesRows      = dropHeaderRows(classesRows, '拠点', '曜日');
+  noticeRows       = dropHeaderRows(noticeRows, '項目', '内容');
+  programsRows     = dropHeaderRows(programsRows, 'タグ', 'クラス名');
+  eventsRows       = dropHeaderRows(eventsRows, '日付', '時間');
+  descriptionsRows = dropHeaderRows(descriptionsRows, 'クラス名', '説明文');
+
   classes = (classesRows || []).filter(r => r[0]).map(r => ({
     studio:    STUDIO_JA_REV[r[0]] || 'yakuin',
     day:       DAY_JA_REV[r[1]] ?? 0,
@@ -1818,6 +1873,16 @@ function applyColorFilter(list) {
 let classes = [];
 let noticeData = { catch: '', closed: '', programs: [] };
 let noticeByMonth = [];    // [{month:'2026-08', catch, closed}, ...]
+
+// 管理画面の編集ブロックは「閉じた状態」が既定。開いたものだけ覚えておく。
+const openProgramBlocks = new Set();
+const openEventBlocks   = new Set();
+
+// 見出しに入力内容を出すときのエスケープ
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, ch =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
 let programsByMonth = [];  // [{month:'2026-08', tag, name, nameColor, desc}, ...]
 
 // ── カレンダーナビ ──
@@ -3127,6 +3192,14 @@ function renderNoticeForm() {
   document.getElementById('ni-closed').value = noticeData.closed || '';
   const container = document.getElementById('program-blocks');
   container.innerHTML = '';
+  if ((noticeData.programs || []).length > 1) {
+    const bar = document.createElement('div');
+    bar.className = 'blk-toolbar';
+    bar.innerHTML = `
+      <button type="button" onclick="setAllProgramBlocks(true)">すべて開く</button>
+      <button type="button" onclick="setAllProgramBlocks(false)">すべて閉じる</button>`;
+    container.appendChild(bar);
+  }
   (noticeData.programs || []).forEach((p, i) => renderProgramBlock(p, i));
 }
 
@@ -3135,9 +3208,16 @@ function renderProgramBlock(p, i) {
   const div = document.createElement('div');
   div.className = 'program-input-block';
   div.dataset.index = i;
+  const isOpen = openProgramBlocks.has(i);
+  const summary = (p.name || p.tag || '').trim();
   div.innerHTML = `
-    <div class="prog-num">プログラム ${i + 1}</div>
+    <div class="prog-num blk-head" onclick="toggleProgramBlock(${i})">
+      <span class="blk-arrow" id="prog-arrow-${i}">${isOpen ? '▼' : '▶'}</span>
+      <span>プログラム ${i + 1}</span>
+      <span class="blk-summary ${summary ? '' : 'empty'}">${summary ? escHtml(summary) : '（未入力）'}</span>
+    </div>
     <button class="prog-block-del" onclick="deleteProgramBlock(${i})">削除</button>
+    <div class="blk-body" id="prog-body-${i}" style="${isOpen ? '' : 'display:none'}">
     <div class="notice-input-row" style="margin-bottom:8px;">
       <label>タグ（小見出し）</label>
       <input type="text" value="${p.tag||''}" placeholder="例：【今日の私の香りを纏う】" oninput="noticeData.programs[${i}].tag=this.value">
@@ -3161,17 +3241,40 @@ function renderProgramBlock(p, i) {
       <label>QRのリンク先<br><span style="font-size:10px;color:#aaa">空欄ならQRなし</span></label>
       <input type="text" value="${p.qrUrl||''}" placeholder="例：https://studio-grace.flsn.jp/sys/" oninput="noticeData.programs[${i}].qrUrl=this.value">
     </div>
+    </div>
   `;
   container.appendChild(div);
 }
 
+// 見出しをクリックした時だけ開閉する（入力中の内容が消えないよう、再描画はしない）
+function toggleProgramBlock(i) {
+  const body  = document.getElementById(`prog-body-${i}`);
+  const arrow = document.getElementById(`prog-arrow-${i}`);
+  if (!body) return;
+  const nowOpen = body.style.display === 'none';
+  body.style.display = nowOpen ? '' : 'none';
+  if (arrow) arrow.textContent = nowOpen ? '▼' : '▶';
+  if (nowOpen) openProgramBlocks.add(i); else openProgramBlocks.delete(i);
+}
+
+function setAllProgramBlocks(open) {
+  (noticeData.programs || []).forEach((p, i) => {
+    const body = document.getElementById(`prog-body-${i}`);
+    if (!body) return;
+    const isOpen = body.style.display !== 'none';
+    if (isOpen !== open) toggleProgramBlock(i);
+  });
+}
+
 function addProgramBlock() {
   noticeData.programs.push({ tag:'', name:'', nameColor:'purple', desc:'', qrUrl:'' });
+  openProgramBlocks.add(noticeData.programs.length - 1);  // 追加した分だけ開いた状態にする
   renderNoticeForm();
 }
 
 function deleteProgramBlock(i) {
   noticeData.programs.splice(i, 1);
+  openProgramBlocks.clear();   // 番号がずれるので、いったん全部閉じる
   renderNoticeForm();
 }
 
@@ -3285,11 +3388,23 @@ function renderEventDetailForm() {
   const container = document.getElementById('event-detail-blocks');
   container.innerHTML = '';
   const targetMonth = getCurrentTargetMonth();
+  const visible = eventDetails
+    .map((ev, i) => ({ ev, i }))
+    .filter(({ ev }) => {
+      // 対象月のイベントだけを表示する（日付未入力のものは常に表示）
+      const evMonth = (ev.date || '').slice(0, 7);
+      return !ev.date || evMonth === targetMonth;
+    });
+  if (visible.length > 1) {
+    const bar = document.createElement('div');
+    bar.className = 'blk-toolbar';
+    bar.innerHTML = `
+      <button type="button" onclick="setAllEventBlocks(true)">すべて開く</button>
+      <button type="button" onclick="setAllEventBlocks(false)">すべて閉じる</button>`;
+    container.appendChild(bar);
+  }
   let shown = 0;
-  eventDetails.forEach((ev, i) => {
-    // 対象月のイベントだけを表示する（日付未入力のものは常に表示）
-    const evMonth = (ev.date || '').slice(0, 7);
-    if (ev.date && evMonth !== targetMonth) return;
+  visible.forEach(({ ev, i }) => {
     shown++;
     renderEventDetailBlock(ev, i, shown);
   });
@@ -3306,10 +3421,20 @@ function renderEventDetailBlock(ev, i, displayNo) {
   const div = document.createElement('div');
   div.className = 'event-detail-block';
   const previewStyle = ev.photo ? 'display:block' : 'display:none';
+  const isOpen = openEventBlocks.has(i);
+  const summaryParts = [];
+  if (ev.date) summaryParts.push(ev.date.replace(/^\d{4}-/, '').replace('-', '/'));
+  if (ev.name) summaryParts.push(String(ev.name).replace(/\n/g, ' '));
+  const summary = summaryParts.join('　');
 
   div.innerHTML = `
-    <div class="ed-num">★ イベント ${displayNo || (i + 1)}</div>
+    <div class="ed-num blk-head" onclick="toggleEventBlock(${i})">
+      <span class="blk-arrow" id="ed-arrow-${i}">${isOpen ? '▼' : '▶'}</span>
+      <span>★ イベント ${displayNo || (i + 1)}</span>
+      <span class="blk-summary ${summary ? '' : 'empty'}">${summary ? escHtml(summary) : '（未入力）'}</span>
+    </div>
     <button class="ed-del" onclick="deleteEventDetail(${i})">削除</button>
+    <div class="blk-body" id="ed-body-${i}" style="${isOpen ? '' : 'display:none'}">
     <div class="ed-grid">
       <div class="ed-field">
         <label>日付</label>
@@ -3366,12 +3491,33 @@ function renderEventDetailBlock(ev, i, displayNo) {
         </select>
       </div>
     </div>
+    </div>
   `;
   container.appendChild(div);
 
   // selectのstyleを適用
   div.querySelectorAll('select').forEach(s => {
     s.style.cssText = 'padding:7px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:Noto Sans JP,sans-serif;width:100%;';
+  });
+}
+
+// 見出しをクリックした時だけ開閉する（入力中の内容が消えないよう、再描画はしない）
+function toggleEventBlock(i) {
+  const body  = document.getElementById(`ed-body-${i}`);
+  const arrow = document.getElementById(`ed-arrow-${i}`);
+  if (!body) return;
+  const nowOpen = body.style.display === 'none';
+  body.style.display = nowOpen ? '' : 'none';
+  if (arrow) arrow.textContent = nowOpen ? '▼' : '▶';
+  if (nowOpen) openEventBlocks.add(i); else openEventBlocks.delete(i);
+}
+
+function setAllEventBlocks(open) {
+  eventDetails.forEach((ev, i) => {
+    const body = document.getElementById(`ed-body-${i}`);
+    if (!body) return;
+    const isOpen = body.style.display !== 'none';
+    if (isOpen !== open) toggleEventBlock(i);
   });
 }
 
@@ -3455,11 +3601,13 @@ function addEventDetailBlock() {
   const m = getCurrentTargetMonth();
   const defaultDate = m ? `${m}-01` : '';
   eventDetails.push({ date:defaultDate, time:'', studio:'', teacher:'', name:'', desc:'', photo:'', childcare:'', online:'' });
+  openEventBlocks.add(eventDetails.length - 1);  // 追加した分だけ開いた状態にする
   renderEventDetailForm();
 }
 
 function deleteEventDetail(i) {
   eventDetails.splice(i, 1);
+  openEventBlocks.clear();   // 番号がずれるので、いったん全部閉じる
   renderEventDetailForm();
 }
 
