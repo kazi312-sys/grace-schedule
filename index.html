@@ -1153,7 +1153,7 @@
       <div><label style="font-size:12px;color:#888;">繰り返し</label><select id="cem-repeat" style="width:100%;padding:7px;" onchange="cemToggleRepeatFields()"><option value="weekly">毎週</option><option value="biweekly">隔週</option><option value="nth">第N曜日</option><option value="once">単発（日付指定）</option></select></div>
       <div><label style="font-size:12px;color:#888;">曜日</label><select id="cem-day" style="width:100%;padding:7px;"></select></div>
       <div id="cem-nth-row" style="grid-column:1/3;"><label style="font-size:12px;color:#888;">第何週（第N曜日を選んだ時／複数はカンマ区切り 例:1,3）</label><input type="text" id="cem-nth" placeholder="例：3" style="width:100%;padding:6px;"></div>
-      <div id="cem-date-row"><label style="font-size:12px;color:#888;">日付（単発時）</label><input type="date" id="cem-date" style="width:100%;padding:6px;"></div>
+      <div id="cem-date-row"><label style="font-size:12px;color:#888;">日付（単発時）</label><input type="date" id="cem-date" style="width:100%;padding:6px;" oninput="cemEchoDate()" onchange="cemEchoDate()"><div id="cem-date-echo" style="font-size:12px;margin-top:4px;min-height:1.2em;"></div></div>
       <div></div>
       <div id="cem-startdate-row"><label style="font-size:12px;color:#888;">開始日（隔週の基準日にもなります）</label><input type="date" id="cem-startdate" style="width:100%;padding:6px;"></div>
       <div id="cem-enddate-row"><label style="font-size:12px;color:#888;">終了日（毎週,任意）</label><input type="date" id="cem-enddate" style="width:100%;padding:6px;"></div>
@@ -1348,7 +1348,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-07c</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-20b</span>
     </div>
   </div>
 
@@ -2202,7 +2202,9 @@ function renderSchedule() {
         td.style.cursor = 'pointer';
         td.title = 'クリックしてクラスを追加';
         td.classList.add('addable-cell');
-        td.onclick = () => openClassAddModal(actualDay, slot);
+        // クリックしたセルの日付も渡しておく（「単発」に切り替えたとき日付が空にならないように）
+        const addISO = fmtISO(cellDate);
+        td.onclick = () => openClassAddModal(actualDay, slot, addISO, 'weekly');
       }
 
       tr.appendChild(td);
@@ -2500,17 +2502,46 @@ let cemOccurrenceDate = null;  // クリックして開いた「その日」の�
 function cemToggleRepeatFields() {
   const mode = document.getElementById('cem-repeat').value;
   const isOnce = mode === 'once';
+  // 「単発」に切り替えたとき日付が空なら、クリックした日（なければ今日）を入れておく
+  if (isOnce) {
+    const dEl = document.getElementById('cem-date');
+    if (dEl && !dEl.value) dEl.value = cemOccurrenceDate || fmtISO(new Date());
+  }
   document.getElementById('cem-date-row').style.display = isOnce ? '' : 'none';
   document.getElementById('cem-nth-row').style.display = mode === 'nth' ? '' : 'none';
   document.getElementById('cem-startdate-row').style.display = isOnce ? 'none' : '';
   document.getElementById('cem-enddate-row').style.display = isOnce ? 'none' : '';
+  cemEchoDate();
+}
+
+// 日付欄の中身を、その場で日本語で読み上げて見せる。
+// 日付欄は数字を打っただけでは入らないことがあり、入っていないことに気づけないため。
+function cemEchoDate() {
+  const el = document.getElementById('cem-date');
+  const echo = document.getElementById('cem-date-echo');
+  if (!el || !echo) return;
+  const v = el.value;
+  if (!v) {
+    echo.style.color = '#c04040';
+    echo.textContent = '⚠ 日付が入っていません（カレンダーのアイコンから選んでください）';
+    return;
+  }
+  const d = new Date(v + 'T00:00:00');
+  const y = d.getFullYear();
+  if (isNaN(d.getTime()) || y < 2000 || y > 2100) {
+    echo.style.color = '#c04040';
+    echo.textContent = `⚠ 日付がおかしいようです（${v}）。入れ直してください。`;
+    return;
+  }
+  echo.style.color = '#2a7a3a';
+  echo.textContent = `✓ ${y}年${d.getMonth() + 1}月${d.getDate()}日（${DAYS[d.getDay()]}）`;
 }
 
 // 空欄クリックから新規クラスを追加する
-function openClassAddModal(dayIdx, slot, dateISO) {
+function openClassAddModal(dayIdx, slot, dateISO, defaultRepeat) {
   const cls = {
     studio: (currentStudio === 'online' ? 'yakuin' : currentStudio), type: 'normal',
-    repeat: dateISO ? 'once' : 'weekly', nth: '', tags: '',
+    repeat: defaultRepeat || (dateISO ? 'once' : 'weekly'), nth: '', tags: '',
     day: dayIdx, date: dateISO || '', startDate: '', endDate: '',
     start: slot, end: addMinutesToTime(slot, 60),
     name: '', teacher: '', note: '', color: 'lavender', childcare: '', online: '',
@@ -2623,6 +2654,33 @@ function cemReadForm() {
   };
 }
 
+// 「保存はできるのに画面に出てこない」条件を、保存前に見つける
+function whyClassWouldNotShow(c) {
+  if (c.repeat === 'once') {
+    const v = String(c.date || '').trim();
+    if (!v) {
+      return '「単発（日付指定）」のときは、日付を入れてください。\n\n'
+           + '日付欄は、数字を打つだけでは入らないことがあります。\n'
+           + '右側のカレンダーのアイコンから選ぶと確実です。\n\n'
+           + '空のままだと保存はされますが、スケジュールには一切表示されません。';
+    }
+    const y = Number(v.slice(0, 4));
+    if (!(y >= 2000 && y <= 2100)) {
+      return `日付が「${v}」になっています。\n\n`
+           + '入力の途中で桁がずれた可能性があります。\n'
+           + 'カレンダーのアイコンから選び直してください。';
+    }
+  }
+  if (c.repeat === 'nth' && !String(c.nth || '').trim()) {
+    return '「第◯曜日」のときは、第何週かを選んでください。\n\n'
+         + '未指定のままだと保存はされますが、スケジュールには一切表示されません。';
+  }
+  if (c.startDate && c.endDate && c.startDate > c.endDate) {
+    return '開始日が終了日より後になっています。\n\nこのままだとスケジュールには一切表示されません。';
+  }
+  return '';
+}
+
 async function cemApplyAndRefresh() {
   closeClassEditModal(false);
   await saveData();
@@ -2638,6 +2696,11 @@ async function cemSave() {
     return;
   }
   const edited = cemReadForm();
+
+  // 日付や週の指定が抜けていると、保存はできてもスケジュールに一切出てこない。
+  // 気づけないまま消えたように見えるので、ここで止める。
+  const missing = whyClassWouldNotShow(edited);
+  if (missing) { alert(missing); return; }
 
   // 繰り返しクラスなら「この日だけ／すべて」を確認する
   if (canScopeEdit()) {
@@ -2971,6 +3034,20 @@ function updateMonth() {
 
 // ======= 保存・更新 =======
 async function saveAndShow() {
+  // 画面に出てこない行が混ざっていたら、保存する前に知らせる
+  const broken = [];
+  classes.forEach((c, i) => {
+    const why = whyClassWouldNotShow(c);
+    if (why) broken.push(`${i + 1}行目「${c.name || '(クラス名なし)'}」`);
+  });
+  if (broken.length) {
+    const ok = confirm(
+      '次の行は、保存してもスケジュールに表示されません。\n'
+      + '（単発なのに日付がない／第◯曜日なのに週の指定がない、など）\n\n'
+      + broken.join('\n')
+      + '\n\nこのまま保存しますか？\n「キャンセル」を押すと、入力画面に戻って直せます。');
+    if (!ok) return;
+  }
   await saveData();
   renderSchedule();
   switchMode('view-schedule');
