@@ -1083,8 +1083,36 @@
 
   /* 印刷 */
   .print-only { display: none; }
+  /* 印刷の直前だけ付けるクラス。
+     印刷用の見た目で一度組み直して寸法を測り、A4 1枚に収まる倍率を計算するために使う。
+     （@media print のルールは印刷中しか効かないので、測るには同じ指定がもう一組いる） */
+  body.printing .mode-bar,
+  body.printing .view:not(.active),
+  body.printing #view-data,
+  body.printing .studio-tabs,
+  body.printing .action-bar,
+  body.printing .view-mode-btns,
+  body.printing .week-nav,
+  body.printing #color-filter-bar,
+  body.printing .data-subnav,
+  body.printing header .sub,
+  body.printing #edit-tab-btn,
+  body.printing #gsi-sync-note { display: none !important; }
+  body.printing header { padding: 8px 10px; }
+  body.printing .view { padding: 0; }
+  body.printing .print-only {
+    display: block; margin: 4px 0 10px; font-size: 15px; font-weight: 700;
+    color: #3A2E28; letter-spacing: .05em;
+  }
+  body.printing table.schedule { box-shadow: none; width: 100%; font-size: 11px; }
+  body.printing table.schedule th,
+  body.printing table.schedule td { padding: 3px; }
+  /* 画面では所要時間ぶんの高さを取っているが、紙では中身の高さで十分 */
+  body.printing .class-cell { min-height: 0 !important; }
+  body.printing table.schedule tr.empty-slot td { height: 10px !important; padding: 0 2px !important; }
+
   @media print {
-    @page { size: landscape; margin: 10mm; }
+    @page { size: A4 landscape; margin: 10mm; }
     html, body { background: #fff !important; }
     * {
       print-color-adjust: exact !important;
@@ -1104,6 +1132,8 @@
     }
     table.schedule { box-shadow: none; width: 100%; font-size: 11px; }
     table.schedule th, table.schedule td { padding: 3px; }
+    .class-cell { min-height: 0 !important; }
+    table.schedule tr.empty-slot td { height: 10px !important; padding: 0 2px !important; }
     tr, .class-cell { break-inside: avoid; }
     .class-cell { border: 1px solid rgba(0,0,0,.08); }
     .month-calendar-wrap { box-shadow: none; }
@@ -1382,7 +1412,7 @@
   <div class="legend" id="legend"></div>
 
   <div class="action-bar" style="margin-top:16px;">
-    <button class="btn btn-secondary" onclick="window.print()">🖨 印刷 / PDF保存</button>
+    <button class="btn btn-secondary" onclick="printOnePage()">🖨 印刷 / PDF保存（A4・1枚）</button>
   </div>
 </div>
 
@@ -1446,7 +1476,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-02b</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-02c</span>
     </div>
   </div>
 
@@ -3026,6 +3056,75 @@ async function cemDelete() {
   classes.splice(cemEditIndex, 1);
   await cemApplyAndRefresh();
 }
+
+// ======= 印刷（A4・1枚に収める） =======
+// 中身の量は週や拠点で変わるので、印刷の直前に実寸を測って縮小率を決める。
+const PRINT_PAGE = { w: 297, h: 210, margin: 10 };   // A4横・余白mm
+
+function applyPrintFit() {
+  const view = document.querySelector('.view.active');
+  if (!view) return;
+
+  document.body.classList.add('printing');
+  view.style.zoom = '';
+  view.style.width = '';
+
+  const MM = 96 / 25.4;                                  // 1mm が何px か
+  const availW = (PRINT_PAGE.w - PRINT_PAGE.margin * 2) * MM;
+  const availH = (PRINT_PAGE.h - PRINT_PAGE.margin * 2) * MM;
+
+  // 印刷時の幅に合わせてから測らないと、折り返しが変わって高さがずれる
+  view.style.width = availW + 'px';
+
+  const header = document.querySelector('header');
+  const headerH = header ? header.getBoundingClientRect().height : 0;
+
+  const contentW = Math.max(view.scrollWidth, 1);
+  const contentH = Math.max(view.scrollHeight, 1);
+
+  // 0.98 は、計算誤差で2ページ目が出るのを防ぐための余裕
+  const k = Math.min(1, availW / contentW, (availH - headerH) / contentH * 0.98);
+
+  if (k < 1) {
+    // transform だと縮小しても元の場所を取り続け、高さを固定すると下が切れてしまう。
+    // zoom なら組み直されるので、切れずに詰まる。
+    view.style.zoom = k;
+    view.style.width = (availW / k) + 'px';   // 縮小後に紙幅いっぱいになるようにする
+  } else {
+    view.style.width = '';
+  }
+  return k;
+}
+
+function clearPrintFit() {
+  const view = document.querySelector('.view.active');
+  if (view) {
+    view.style.zoom = '';
+    view.style.width = '';
+  }
+  document.body.classList.remove('printing');
+}
+
+function printOnePage() {
+  const k = applyPrintFit();
+  // 週表示はA4で4ページ分ほどの情報量がある。無理に1枚へ押し込むと読めなくなるので、先に知らせる。
+  if (typeof k === 'number' && k < 0.5) {
+    const pct = Math.max(1, Math.round(k * 100));
+    const ok = confirm(
+      `このまま1枚に収めると、文字が元の約${pct}%まで小さくなり、読みづらくなります。\n\n`
+      + `いま開いている表は、A4で約${Math.ceil(1 / k)}ページ分の情報量があります。\n`
+      + `「月表示」に切り替えると、ちょうど1枚に収まります。\n\n`
+      + `OK：このまま1枚に印刷する\nキャンセル：やめる`);
+    if (!ok) { clearPrintFit(); return; }
+  }
+  window.print();
+}
+
+// ブラウザのメニューや Ctrl+P から印刷された場合にも効かせる
+window.addEventListener('beforeprint', () => {
+  if (!document.body.classList.contains('printing')) applyPrintFit();
+});
+window.addEventListener('afterprint', clearPrintFit);
 
 // ======= 休講日の設定 =======
 let clDate = null;
