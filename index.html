@@ -1348,7 +1348,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-10-20b</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-02a</span>
     </div>
   </div>
 
@@ -2588,7 +2588,13 @@ function openClassEditModal(idx, isNew, occurrenceISO) {
     const eh = document.getElementById(hId), em = document.getElementById(mId);
     eh.innerHTML = hourOpts.map(o => `<option value="${o}">${o}</option>`).join('');
     em.innerHTML = minOpts.map(o => `<option value="${o}">${o}</option>`).join('');
-    eh.value = h; em.value = m;
+    // シートには "8:50" のように0なしで入っていることがある。
+    // 選択肢は "08" なので、桁を揃えないと選択が外れ、保存時に時が消えてしまう。
+    const pad = s => String(Number(s)).padStart(2, '0');
+    const hv = isNaN(Number(h)) ? '10' : pad(h);
+    const mv = isNaN(Number(m)) ? '00' : pad(m);
+    eh.value = hourOpts.includes(hv) ? hv : '10';
+    em.value = minOpts.includes(mv) ? mv : '00';
   };
   fillTime('cem-start-h', 'cem-start-m', cls.start);
   fillTime('cem-end-h', 'cem-end-m', cls.end);
@@ -2656,6 +2662,12 @@ function cemReadForm() {
 
 // 「保存はできるのに画面に出てこない」条件を、保存前に見つける
 function whyClassWouldNotShow(c) {
+  // 時刻が "：50" のように時が欠けていると、どの時間帯にも置けず画面から消える
+  const badTime = t => !/^\d{1,2}:\d{2}$/.test(String(t || '').trim());
+  if (badTime(c.start) || badTime(c.end)) {
+    return `時刻が正しくありません（開始「${c.start || '空欄'}」／終了「${c.end || '空欄'}」）。\n\n`
+         + 'このままだとスケジュールには一切表示されません。\n開始・終了を選び直してください。';
+  }
   if (c.repeat === 'once') {
     const v = String(c.date || '').trim();
     if (!v) {
