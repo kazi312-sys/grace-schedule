@@ -603,6 +603,58 @@
     cursor: pointer;
   }
 
+  /* ── 休講の表示 ── */
+  td.closed-col {
+    background: repeating-linear-gradient(45deg, #f2eee8, #f2eee8 7px, #e9e3da 7px, #e9e3da 14px);
+  }
+  .closed-band {
+    background: #6b5b4a;
+    color: #fff;
+    border-radius: 5px;
+    padding: 9px 6px;
+    text-align: center;
+  }
+  .closed-band-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+  .closed-band-note {
+    font-size: 10px;
+    opacity: 0.85;
+    margin-top: 4px;
+    line-height: 1.45;
+  }
+  .class-cell.is-closed {
+    background: #e6e1d9 !important;
+    color: #948b80 !important;
+  }
+  .class-cell.is-closed .class-name,
+  .class-cell.is-closed .class-teacher,
+  .class-cell.is-closed .class-time { text-decoration: line-through; }
+  .closed-stamp {
+    display: block;
+    background: #8a4a4a;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-bottom: 3px;
+    text-align: center;
+  }
+  .th-closed-badge {
+    display: inline-block;
+    margin-top: 3px;
+    font-size: 10px;
+    background: #6b5b4a;
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 6px;
+    letter-spacing: 0.06em;
+  }
+
   /* ── 編集ブロックの開閉（既定は閉じた状態） ── */
   .blk-head {
     cursor: pointer;
@@ -1189,6 +1241,52 @@
   <div class="sub">yoga · ballet · studio</div>
 </header>
 
+<!-- ===== 休講日の設定 ===== -->
+<div id="closed-day-overlay" onclick="if(event.target===this)closeClosedDayModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:10px;max-width:470px;width:100%;padding:22px;max-height:88vh;overflow:auto;">
+    <h3 style="margin:0 0 4px;font-size:17px;color:#3A2E28;">🚫 休講の設定</h3>
+    <div id="cl-date-label" style="font-size:13px;color:#8a7a68;margin-bottom:6px;"></div>
+    <div style="font-size:11px;color:#aaa;margin-bottom:14px;">クラスの設定は変わりません。解除すれば元通りになります。</div>
+
+    <div id="cl-existing"></div>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">新しく休講にする</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:12px;color:#888;">対象</label>
+          <select id="cl-studio" style="width:100%;padding:7px;"></select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#888;">範囲</label>
+          <select id="cl-range-mode" style="width:100%;padding:7px;" onchange="clToggleRange()">
+            <option value="all">終日</option>
+            <option value="time">時間を指定</option>
+          </select>
+        </div>
+      </div>
+      <div id="cl-time-row" style="display:none;margin-top:12px;">
+        <label style="font-size:12px;color:#888;">休講にする時間帯</label>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <select id="cl-from-h" style="flex:1;padding:7px;"></select>:<select id="cl-from-m" style="flex:1;padding:7px;"></select>
+          <span style="color:#888;">〜</span>
+          <select id="cl-to-h" style="flex:1;padding:7px;"></select>:<select id="cl-to-m" style="flex:1;padding:7px;"></select>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-top:4px;">例：17:00〜23:00 と指定すると「17:00以降休講」になります。</div>
+      </div>
+      <div style="margin-top:12px;">
+        <label style="font-size:12px;color:#888;">メモ（任意・画面に表示されます）</label>
+        <input type="text" id="cl-note" placeholder="例：祝日のため" style="width:100%;padding:7px;">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn btn-secondary" onclick="closeClosedDayModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="clSave()">💾 この日を休講にする</button>
+    </div>
+  </div>
+</div>
+
 <div class="mode-bar">
   <button class="active" onclick="switchMode('view-schedule')">📅 スケジュール表示</button>
   <button id="edit-tab-btn" onclick="switchMode('view-data')" style="display:none;">✏️ データ入力</button>
@@ -1348,7 +1446,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-02a</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-02b</span>
     </div>
   </div>
 
@@ -1387,6 +1485,17 @@
     <div class="action-bar" style="margin-top:14px;">
       <button class="btn btn-primary" onclick="saveEventDetailsAndShow()">💾 イベント詳細を保存・反映</button>
     </div>
+  </div>
+
+  <!-- 休講日 -->
+  <div class="form-section">
+    <h3>🚫 休講日の設定</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;">
+      お休みにする日を登録します。<strong>クラスの設定には一切影響しません。</strong>解除すれば元どおり表示されます。<br>
+      スケジュール画面で日付の見出し（「月 11/2」など）をクリックしても登録できます。
+    </div>
+    <div id="closed-day-list"></div>
+    <button class="btn-add" onclick="openClosedDayModal(getCurrentTargetMonth() + '-01')" style="margin-top:8px;">＋ 休講日を追加</button>
   </div>
 
   </div>
@@ -1467,6 +1576,7 @@ const SHEETS = {
   programs: 'お知らせプログラム',
   events:   'イベントピックアップ',
   descriptions: 'クラス説明',
+  closed:   '休講日',
 };
 
 // クラス名ごとの説明文（同じクラス名なら共通で使い回す）
@@ -1592,8 +1702,9 @@ function dropHeaderRows(rows, col1, col2) {
   );
 }
 
-function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows, descriptionsRows) {
+function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows, descriptionsRows, closedRows) {
   // データの中に見出し行が混ざっていても、クラスやイベントとして扱わないようにする
+  closedRows       = dropHeaderRows(closedRows, '日付', '拠点');
   classesRows      = dropHeaderRows(classesRows, '拠点', '曜日');
   noticeRows       = dropHeaderRows(noticeRows, '項目', '内容');
   programsRows     = dropHeaderRows(programsRows, 'タグ', 'クラス名');
@@ -1639,6 +1750,16 @@ function applyLoadedRows(classesRows, noticeRows, programsRows, eventsRows, desc
     online: onlineJaToFlag(r[8]),
   }));
 
+  // 休講日：クラスのデータとは別の層。1行消せば元通りになる。
+  // 拠点が空欄なら全拠点。拠点名が読めない行は、事故防止のため何も休講にしない。
+  closedDays = (closedRows || []).filter(r => r[0]).map(r => ({
+    date:   normalizeDateStr(r[0]),
+    studio: String(r[1] || '').trim()
+              ? (STUDIO_JA_REV[String(r[1]).trim()] || '__unknown__') : '',
+    range:  String(r[2] || '').trim() || '終日',
+    note:   r[3] || '',
+  })).filter(cd => /^\d{4}-\d{2}-\d{2}$/.test(cd.date));
+
   // クラス名 → 説明文
   classDescriptions = {};
   (descriptionsRows || []).forEach(r => {
@@ -1672,7 +1793,7 @@ async function publicLoadAll() {
     const res = await fetch(PUBLIC_API_URL);
     if (!res.ok) throw new Error('public api error: ' + res.status);
     const data = await res.json();
-    applyLoadedRows(data.classesRows, data.noticeRows, data.programsRows, data.eventsRows, data.descriptionsRows);
+    applyLoadedRows(data.classesRows, data.noticeRows, data.programsRows, data.eventsRows, data.descriptionsRows, data.closedRows);
   } catch (e) {
     console.error(e);
     alert('スケジュールデータの読み込みに失敗しました。時間をおいて再度お試しください。');
@@ -1741,7 +1862,7 @@ async function gsiClearAndWrite(sheetName, range, values) {
 }
 
 // シートが無ければ作成する（クラス説明シートの初回保存用）
-async function gsiEnsureSheet(sheetName) {
+async function gsiEnsureSheet(sheetName, headers) {
   const infoUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}?fields=sheets.properties.title`;
   const info = await gsiFetch(infoUrl);
   const exists = (info.sheets || []).some(sh => sh.properties && sh.properties.title === sheetName);
@@ -1753,12 +1874,32 @@ async function gsiEnsureSheet(sheetName) {
     body: JSON.stringify({ requests: [{ addSheet: { properties: { title: sheetName } } }] }),
   });
   // 見出し行を入れておく
-  const headRange = `${sheetName}!A3:B3`;
+  const cols = (headers && headers.length) ? headers : ['クラス名', '説明文'];
+  const lastCol = String.fromCharCode(64 + cols.length);
+  const headRange = `${sheetName}!A3:${lastCol}3`;
   const headUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GSI_CONFIG.SPREADSHEET_ID}/values/${encodeURIComponent(headRange)}?valueInputOption=USER_ENTERED`;
-  await gsiFetch(headUrl, { method: 'PUT', body: JSON.stringify({ range: headRange, values: [['クラス名', '説明文']] }) });
+  await gsiFetch(headUrl, { method: 'PUT', body: JSON.stringify({ range: headRange, values: [cols] }) });
 }
 
 // クラス名ごとの説明文を保存する
+async function gsiSaveClosedDays() {
+  showSyncNote(true);
+  try {
+    await gsiEnsureSheet(SHEETS.closed, ['日付', '拠点', '範囲', 'メモ']);
+    const values = closedDays
+      .filter(cd => cd.date)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(cd => [
+        cd.date,
+        cd.studio ? (STUDIO_JA[cd.studio] || '') : '',
+        cd.range || '終日',
+        cd.note || '',
+      ]);
+    await gsiClearAndWrite(SHEETS.closed, `${SHEETS.closed}!A4:D1000`, values);
+  } catch (e) { console.error(e); alertSaveFailed(e); throw e; }
+  finally { showSyncNote(false); }
+}
+
 async function gsiSaveDescriptions() {
   showSyncNote(true);
   try {
@@ -1873,6 +2014,59 @@ function applyColorFilter(list) {
 let classes = [];
 let noticeData = { catch: '', closed: '', programs: [] };
 let noticeByMonth = [];    // [{month:'2026-08', catch, closed}, ...]
+
+// ======= 休講日 =======
+// クラスのデータには一切触らない「別の層」。この配列から1件消せば完全に元通りになる。
+let closedDays = [];   // [{date:'2026-11-23', studio:''（空=全拠点）, range:'終日'|'17:00-23:59', note:''}]
+
+function timeToMinutes(t) {
+  const [h, m] = String(t || '').split(':').map(Number);
+  return isNaN(h) ? NaN : h * 60 + (m || 0);
+}
+
+// range が時間帯指定なら {from,to} を返す。終日なら null。
+function parseClosedRange(range) {
+  const t = String(range || '').trim();
+  if (!t || t === '終日') return null;
+  const m = t.match(/^(\d{1,2}:\d{2})\s*[-－〜~]\s*(\d{1,2}:\d{2})$/);
+  return m ? { from: m[1], to: m[2] } : null;
+}
+
+function closedRangeLabel(cd) {
+  const r = parseClosedRange(cd && cd.range);
+  return r ? `${r.from}〜${r.to} 休講` : '終日休講';
+}
+
+// その日・その拠点にかかっている休講設定
+function closuresFor(dateISO, studioKey) {
+  return closedDays.filter(cd => cd.date === dateISO && (!cd.studio || cd.studio === studioKey));
+}
+
+// 終日休講なら、その設定を返す
+function wholeDayClosure(dateISO, studioKey) {
+  return closuresFor(dateISO, studioKey).find(cd => !parseClosedRange(cd.range)) || null;
+}
+
+// そのクラスが休講にかかるか（終日、または時間帯が重なる）
+function closureForClass(cls, dateISO) {
+  for (const cd of closuresFor(dateISO, cls.studio)) {
+    const r = parseClosedRange(cd.range);
+    if (!r) return cd;
+    const s = timeToMinutes(cls.start), e = timeToMinutes(cls.end);
+    const rs = timeToMinutes(r.from), re = timeToMinutes(r.to);
+    if (!isNaN(s) && !isNaN(e) && s < re && e > rs) return cd;
+  }
+  return null;
+}
+
+// いま表示中のタブで、その日が終日休講か
+function tabWholeDayClosure(dateISO) {
+  if (currentStudio === 'online') {
+    // オンラインタブは拠点が混ざるので、全拠点休講のときだけ終日扱いにする
+    return closedDays.find(cd => cd.date === dateISO && !cd.studio && !parseClosedRange(cd.range)) || null;
+  }
+  return wholeDayClosure(dateISO, currentStudio);
+}
 
 // 管理画面の編集ブロックは「閉じた状態」が既定。開いたものだけ覚えておく。
 const openProgramBlocks = new Set();
@@ -2075,8 +2269,20 @@ function renderSchedule() {
     const el = document.getElementById(id);
     if (!el) return;
     const isToday = d.getTime() === today.getTime();
-    el.innerHTML = `${dayNames[di]}<br><span style="font-size:11px;opacity:0.8">${fmtMD(d)}</span>`;
+    const closure = tabWholeDayClosure(fmtISO(d));
+    el.innerHTML = `${dayNames[di]}<br><span style="font-size:11px;opacity:0.8">${fmtMD(d)}</span>`
+      + (closure ? `<br><span class="th-closed-badge">休講</span>` : '');
     el.style.outline = isToday ? '2px solid var(--gold)' : '';
+    // 管理者は日付の見出しをクリックして、その日を休講にできる
+    if (gsiAccessToken) {
+      el.style.cursor = 'pointer';
+      el.title = closure ? 'クリックして休講の設定を変更' : 'クリックしてこの日を休講にする';
+      const iso = fmtISO(d);
+      el.onclick = () => openClosedDayModal(iso);
+    } else {
+      el.style.cursor = '';
+      el.onclick = null;
+    }
   });
 
   // 週ラベル更新
@@ -2128,7 +2334,7 @@ function renderSchedule() {
   const tbody = document.getElementById('schedule-body');
   tbody.innerHTML = '';
 
-  displaySlots.forEach(slot => {
+  displaySlots.forEach((slot, slotIdx) => {
     const tr = document.createElement('tr');
     // 1週間を通してクラスが無い時間帯は、行の高さを小さくする
     if (!usedSlots.has(slot)) tr.classList.add('empty-slot');
@@ -2144,6 +2350,21 @@ function renderSchedule() {
       if (actualDay === 6) td.classList.add('sat-col');
       const cellDate = addDays(currentWeekStart, di);
       if (cellDate.getTime() === today.getTime()) td.classList.add('today-col');
+
+      // 終日休講の日は、クラスを出さずに「休講」の帯だけを出す
+      const dayClosure = tabWholeDayClosure(fmtISO(cellDate));
+      if (dayClosure) {
+        td.classList.add('closed-col');
+        if (slotIdx === 0) {
+          const band = document.createElement('div');
+          band.className = 'closed-band';
+          band.innerHTML = `<div class="closed-band-title">休 講</div>`
+            + (dayClosure.note ? `<div class="closed-band-note">${escHtml(dayClosure.note)}</div>` : '');
+          td.appendChild(band);
+        }
+        tr.appendChild(td);
+        return;
+      }
 
       // 5分刻みの開始時刻でも、その時刻を含む30分スロットの行に表示する
       const matched = studioClasses.filter(c => classOccursOn(c, cellDate) && slotOf(c.start) === slot)
@@ -2163,12 +2384,20 @@ function renderSchedule() {
         div.className = 'class-cell';
         div.style.background = colInfo.bg;
         div.style.color = colInfo.fg;
+        // 時間帯だけの休講にかかるクラスは、グレーにして「休講」と出す
+        const partClosure = closureForClass(cls, fmtISO(cellDate));
+        if (partClosure) {
+          div.classList.add('is-closed');
+          div.style.background = '';
+          div.style.color = '';
+        }
         // 実際の所要時間（分）から高さを計算（30分=58px換算）
         const toMin = t => { const [h,m] = String(t||'').split(':').map(Number); return isNaN(h) ? 0 : h*60+m; };
         const durMin = Math.max(toMin(cls.end) - toMin(cls.start), 30);
         div.style.minHeight = Math.round(durMin / 30 * 58) + 'px';
 
         if (cls.type === 'event') div.classList.add('is-event');
+        const closedHTML   = partClosure ? `<span class="closed-stamp">休 講</span>` : '';
         const eventHTML    = cls.type === 'event' ? `<span class="event-ribbon">★ イベント</span>` : '';
         const childcareHTML = cls.childcare === 'ok' ? `<span class="childcare-badge childcare-ok">🍼 託児あり</span>`
                             : cls.childcare === 'no' ? `<span class="childcare-badge childcare-no">託児なし</span>` : '';
@@ -2178,6 +2407,7 @@ function renderSchedule() {
           ? `<div class="class-note">📍 ${STUDIOS[cls.studio] || ''}</div>` : '';
 
         div.innerHTML = `
+          ${closedHTML}
           ${eventHTML}
           <div>${tagsToHTML(cls.tags)}</div>
           <div class="class-name">${cls.name}</div>
@@ -2265,6 +2495,18 @@ function renderMonthCal() {
 
       // この日のクラスを表示（毎週繰り返し／単発日付に対応）
       if (isThisMonth) {
+        const monthClosure = tabWholeDayClosure(fmtISO(cur));
+        if (monthClosure) {
+          td.classList.add('closed-col');
+          const band = document.createElement('div');
+          band.className = 'closed-band';
+          band.innerHTML = `<div class="closed-band-title">休 講</div>`
+            + (monthClosure.note ? `<div class="closed-band-note">${escHtml(monthClosure.note)}</div>` : '');
+          td.appendChild(band);
+          tr.appendChild(td);
+          cur = addDays(cur, 1);
+          continue;
+        }
         const dayClasses = studioClasses.filter(c => classOccursOn(c, cur))
           .sort((a, b) => String(a.start).localeCompare(String(b.start)));
         const maxShow = 3;
@@ -2277,7 +2519,9 @@ function renderMonthCal() {
           pill.textContent = `${cls.start} ${cls.name}`;
           pill.style.cursor = 'pointer';
           pill.title = 'クリックして詳細を見る';
-          pill.onclick = (e) => { e.stopPropagation(); openClassDetail(classes.indexOf(cls), fmtISO(cur)); };
+          // cur はループで進むので、この日の日付をここで確定させておく
+          const pillISO = fmtISO(cur);
+          pill.onclick = (e) => { e.stopPropagation(); openClassDetail(classes.indexOf(cls), pillISO); };
           td.appendChild(pill);
         });
         if (dayClasses.length > maxShow) {
@@ -2447,6 +2691,16 @@ function openDayDetail(dayISO) {
 
   const list = document.getElementById('dd-list');
   list.innerHTML = '';
+
+  const ddClosure = tabWholeDayClosure(dayISO);
+  if (ddClosure) {
+    list.innerHTML = `<div style="background:#6b5b4a;color:#fff;border-radius:6px;padding:12px 14px;margin-bottom:10px;">
+      <div style="font-weight:700;letter-spacing:.08em;">休 講</div>
+      ${ddClosure.note ? `<div style="font-size:12px;opacity:.85;margin-top:4px;">${escHtml(ddClosure.note)}</div>` : ''}
+    </div>`;
+    document.getElementById('day-detail-overlay').style.display = 'flex';
+    return;
+  }
 
   if (dayClasses.length === 0) {
     list.innerHTML = '<div style="color:#999;font-size:13px;padding:8px 0;">この日の予定はありません。</div>';
@@ -2771,6 +3025,141 @@ async function cemDelete() {
   if (!confirm('このクラスを削除しますか？')) return;
   classes.splice(cemEditIndex, 1);
   await cemApplyAndRefresh();
+}
+
+// ======= 休講日の設定 =======
+let clDate = null;
+
+function openClosedDayModal(dateISO) {
+  if (!gsiAccessToken) { requestEditAccess(() => openClosedDayModal(dateISO)); return; }
+  clDate = normalizeDateStr(dateISO);
+  const d = new Date(clDate + 'T00:00:00');
+  document.getElementById('cl-date-label').textContent =
+    `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DAYS[d.getDay()]}）`;
+
+  const sel = document.getElementById('cl-studio');
+  sel.innerHTML = `<option value="">全拠点</option>`
+    + Object.entries(STUDIOS).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
+  sel.value = (currentStudio === 'online') ? '' : currentStudio;
+
+  const hourOpts = Array.from({ length: 18 }, (_, k) => String(k + 6).padStart(2, '0'));
+  const minOpts  = Array.from({ length: 12 }, (_, k) => String(k * 5).padStart(2, '0'));
+  const fill = (id, opts, val) => {
+    const el = document.getElementById(id);
+    el.innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
+    el.value = val;
+  };
+  fill('cl-from-h', hourOpts, '17'); fill('cl-from-m', minOpts, '00');
+  fill('cl-to-h',   hourOpts, '23'); fill('cl-to-m',   minOpts, '00');
+
+  document.getElementById('cl-range-mode').value = 'all';
+  document.getElementById('cl-note').value = '';
+  clToggleRange();
+  renderClosedExisting();
+  document.getElementById('closed-day-overlay').style.display = 'flex';
+}
+
+function closeClosedDayModal() {
+  clDate = null;
+  document.getElementById('closed-day-overlay').style.display = 'none';
+}
+
+function clToggleRange() {
+  const isTime = document.getElementById('cl-range-mode').value === 'time';
+  document.getElementById('cl-time-row').style.display = isTime ? '' : 'none';
+}
+
+// この日にすでに入っている休講を一覧する
+function renderClosedExisting() {
+  const box = document.getElementById('cl-existing');
+  if (!box) return;
+  const items = closedDays
+    .map((cd, i) => ({ cd, i }))
+    .filter(({ cd }) => cd.date === clDate);
+  if (items.length === 0) {
+    box.innerHTML = `<div style="font-size:12px;color:#aaa;">この日はまだ休講になっていません。</div>`;
+    return;
+  }
+  box.innerHTML = `<div style="font-size:12px;color:#888;margin-bottom:8px;">この日の休講設定</div>`
+    + items.map(({ cd, i }) => `
+      <div style="display:flex;align-items:center;gap:8px;background:#f7f4ef;border-radius:5px;padding:9px 11px;margin-bottom:6px;">
+        <div style="flex:1;font-size:13px;color:#3A2E28;">
+          <strong>${cd.studio ? (STUDIOS[cd.studio] || '不明な拠点') : '全拠点'}</strong>
+          <span style="color:#8a7a68;margin-left:6px;">${closedRangeLabel(cd)}</span>
+          ${cd.note ? `<div style="font-size:11px;color:#8a7a68;margin-top:2px;">${escHtml(cd.note)}</div>` : ''}
+        </div>
+        <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="clRemove(${i})">解除</button>
+      </div>`).join('');
+}
+
+async function clSave() {
+  const studio = document.getElementById('cl-studio').value;
+  let range = '終日';
+  if (document.getElementById('cl-range-mode').value === 'time') {
+    const from = document.getElementById('cl-from-h').value + ':' + document.getElementById('cl-from-m').value;
+    const to   = document.getElementById('cl-to-h').value   + ':' + document.getElementById('cl-to-m').value;
+    if (timeToMinutes(from) >= timeToMinutes(to)) {
+      alert('終了の時刻は、開始より後にしてください。');
+      return;
+    }
+    range = `${from}-${to}`;
+  }
+  const note = document.getElementById('cl-note').value.trim();
+
+  const dup = closedDays.some(cd => cd.date === clDate && cd.studio === studio && cd.range === range);
+  if (dup) { alert('同じ内容がすでに登録されています。'); return; }
+
+  closedDays.push({ date: clDate, studio, range, note });
+  if (await clApply()) closeClosedDayModal();
+}
+
+async function clRemove(idx) {
+  if (!closedDays[idx]) return;
+  if (!confirm('この休講を解除しますか？\n\nクラスの設定には影響しません。元どおり表示されるようになります。')) return;
+  const removed = closedDays.splice(idx, 1)[0];
+  if (!(await clApply())) { closedDays.splice(idx, 0, removed); return; }  // 保存できなければ戻す
+  if (clDate) renderClosedExisting();
+}
+
+// 保存して画面に反映する。保存できたら true。
+async function clApply() {
+  try {
+    await gsiSaveClosedDays();
+  } catch (e) {
+    return false;
+  }
+  renderSchedule();
+  renderMonthCal();
+  renderEventCards();
+  renderClosedDayAdmin();
+  return true;
+}
+
+// 管理画面「月ごとの情報」の休講日一覧
+function renderClosedDayAdmin() {
+  const box = document.getElementById('closed-day-list');
+  if (!box) return;
+  const items = closedDays
+    .map((cd, i) => ({ cd, i }))
+    .sort((a, b) => a.cd.date.localeCompare(b.cd.date));
+  if (items.length === 0) {
+    box.innerHTML = `<div style="font-size:13px;color:#999;padding:10px 0;">休講日はまだ登録されていません。</div>`;
+    return;
+  }
+  box.innerHTML = items.map(({ cd, i }) => {
+    const d = new Date(cd.date + 'T00:00:00');
+    const label = isNaN(d.getTime()) ? cd.date
+      : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${DAYS[d.getDay()]}）`;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;background:#f7f4ef;border-radius:5px;padding:10px 12px;margin-bottom:6px;">
+        <div style="flex:1;font-size:13px;color:#3A2E28;">
+          <strong>${label}</strong>
+          <span style="color:#8a7a68;margin-left:8px;">${cd.studio ? (STUDIOS[cd.studio] || '不明な拠点') : '全拠点'}・${closedRangeLabel(cd)}</span>
+          ${cd.note ? `<div style="font-size:11px;color:#8a7a68;margin-top:2px;">${escHtml(cd.note)}</div>` : ''}
+        </div>
+        <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="clRemove(${i})">解除</button>
+      </div>`;
+  }).join('');
 }
 
 // ======= 変更範囲を選ぶダイアログ =======
@@ -3171,7 +3560,7 @@ function switchMode(id) {
   document.querySelectorAll('.mode-bar button').forEach((b, i) => {
     b.classList.toggle('active', (i === 0 && id === 'view-schedule') || (i === 1 && id === 'view-data'));
   });
-  if (id === 'view-data') { renderDataTable(); renderClassDescForm(); renderNoticeForm(); renderEventDetailForm(); }
+  if (id === 'view-data') { renderDataTable(); renderClassDescForm(); renderNoticeForm(); renderEventDetailForm(); renderClosedDayAdmin(); }
 }
 
 // ======= 管理メニューの切り替え =======
@@ -3427,6 +3816,12 @@ function renderEventCards() {
   const todayISO = fmtISO(new Date());
   const monthEvents = (eventDetails || [])
     .filter(ev => ev.date && ev.date >= todayISO)
+    // 終日休講の日のイベントは出さない（拠点名が読めないものは全拠点休講のときだけ外す）
+    .filter(ev => {
+      const key = STUDIO_JA_REV[String(ev.studio || '').trim()] || '';
+      return !closedDays.some(cd =>
+        cd.date === ev.date && !parseClosedRange(cd.range) && (!cd.studio || cd.studio === key));
+    })
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
 
   if (monthEvents.length === 0) {
