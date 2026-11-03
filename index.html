@@ -1104,11 +1104,13 @@
     display: block; margin: 4px 0 10px; font-size: 15px; font-weight: 700;
     color: #3A2E28; letter-spacing: .05em;
   }
-  body.printing table.schedule { box-shadow: none; width: 100%; font-size: 11px; }
+  body.printing table.schedule { box-shadow: none; width: 100%; font-size: 12px; }
   body.printing table.schedule th,
-  body.printing table.schedule td { padding: 3px; }
+  body.printing table.schedule td { padding: 4px; }
   /* 画面では所要時間ぶんの高さを取っているが、紙では中身の高さで十分 */
   body.printing .class-cell { min-height: 0 !important; }
+  /* クラスが1つも入っていない行は紙の無駄なので低くする（文字は縮めない） */
+  body.printing table.schedule tbody tr:not(:has(.class-cell)) td { height: 12px !important; padding: 0 3px !important; }
   body.printing table.schedule tr.empty-slot td { height: 10px !important; padding: 0 2px !important; }
 
   @media print {
@@ -1130,9 +1132,13 @@
       display: block; margin: 4px 0 10px; font-size: 15px; font-weight: 700;
       color: #3A2E28; letter-spacing: .05em;
     }
-    table.schedule { box-shadow: none; width: 100%; font-size: 11px; }
-    table.schedule th, table.schedule td { padding: 3px; }
+    table.schedule { box-shadow: none; width: 100%; font-size: 12px; }
+    table.schedule th, table.schedule td { padding: 4px; }
+    /* 2ページ目以降にも曜日の見出しを出す */
+    table.schedule thead { display: table-header-group; }
+    table.schedule tfoot { display: table-footer-group; }
     .class-cell { min-height: 0 !important; }
+    table.schedule tbody tr:not(:has(.class-cell)) td { height: 12px !important; padding: 0 3px !important; }
     table.schedule tr.empty-slot td { height: 10px !important; padding: 0 2px !important; }
     tr, .class-cell { break-inside: avoid; }
     .class-cell { border: 1px solid rgba(0,0,0,.08); }
@@ -1412,7 +1418,7 @@
   <div class="legend" id="legend"></div>
 
   <div class="action-bar" style="margin-top:16px;">
-    <button class="btn btn-secondary" onclick="printOnePage()">🖨 印刷 / PDF保存（A4・1枚）</button>
+    <button class="btn btn-secondary" onclick="printOnePage()">🖨 印刷 / PDF保存</button>
   </div>
 </div>
 
@@ -1476,7 +1482,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-02c</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-03a</span>
     </div>
   </div>
 
@@ -3057,8 +3063,10 @@ async function cemDelete() {
   await cemApplyAndRefresh();
 }
 
-// ======= 印刷（A4・1枚に収める） =======
-// 中身の量は週や拠点で変わるので、印刷の直前に実寸を測って縮小率を決める。
+// ======= 印刷 =======
+// 月表示：A4横1枚にちょうど収まるので、収まるように縮小する。
+// 週表示：1枚に押し込むと読めなくなるため、縮小しない。横幅だけ紙に合わせ、
+//         足りないぶんは次のページに送る（各ページに曜日の見出しが付く）。
 const PRINT_PAGE = { w: 297, h: 210, margin: 10 };   // A4横・余白mm
 
 function applyPrintFit() {
@@ -3082,8 +3090,12 @@ function applyPrintFit() {
   const contentW = Math.max(view.scrollWidth, 1);
   const contentH = Math.max(view.scrollHeight, 1);
 
-  // 0.98 は、計算誤差で2ページ目が出るのを防ぐための余裕
-  const k = Math.min(1, availW / contentW, (availH - headerH) / contentH * 0.98);
+  // 週表示は高さを詰めない。横幅だけ合わせ、縦は何ページになってもそのまま。
+  // 0.98 は、計算誤差で2ページ目が出るのを防ぐための余裕（月表示のみ）
+  const fitHeight = (calView === 'month');
+  const k = fitHeight
+    ? Math.min(1, availW / contentW, (availH - headerH) / contentH * 0.98)
+    : Math.min(1, availW / contentW);
 
   if (k < 1) {
     // transform だと縮小しても元の場所を取り続け、高さを固定すると下が切れてしまう。
@@ -3106,17 +3118,7 @@ function clearPrintFit() {
 }
 
 function printOnePage() {
-  const k = applyPrintFit();
-  // 週表示はA4で4ページ分ほどの情報量がある。無理に1枚へ押し込むと読めなくなるので、先に知らせる。
-  if (typeof k === 'number' && k < 0.5) {
-    const pct = Math.max(1, Math.round(k * 100));
-    const ok = confirm(
-      `このまま1枚に収めると、文字が元の約${pct}%まで小さくなり、読みづらくなります。\n\n`
-      + `いま開いている表は、A4で約${Math.ceil(1 / k)}ページ分の情報量があります。\n`
-      + `「月表示」に切り替えると、ちょうど1枚に収まります。\n\n`
-      + `OK：このまま1枚に印刷する\nキャンセル：やめる`);
-    if (!ok) { clearPrintFit(); return; }
-  }
+  applyPrintFit();
   window.print();
 }
 
