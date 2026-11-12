@@ -1345,11 +1345,11 @@
   </div>
 
   <div class="studio-tabs">
-    <button class="active" onclick="switchStudio('yakuin')">薬院スタジオ</button>
-    <button onclick="switchStudio('hirao')">平尾スタジオ</button>
-    <button onclick="switchStudio('hirao2')">平尾（アクシオム）</button>
-    <button onclick="switchStudio('takamiya')">高宮スタジオ</button>
-    <button onclick="switchStudio('online')">📷 オンライン配信</button>
+    <button class="active" data-studio="yakuin" onclick="switchStudio('yakuin')">薬院スタジオ</button>
+    <button data-studio="hirao" onclick="switchStudio('hirao')">平尾スタジオ</button>
+    <button data-studio="hirao2" onclick="switchStudio('hirao2')">平尾（アクシオム）</button>
+    <button data-studio="takamiya" onclick="switchStudio('takamiya')">高宮スタジオ</button>
+    <button data-studio="online" onclick="switchStudio('online')">📷 オンライン配信</button>
   </div>
 
   <!-- 表示切替・週ナビ -->
@@ -1482,7 +1482,7 @@
     <div class="month-selector">
       <label>対象月：</label>
       <input type="month" id="target-month" value="2025-06" onchange="updateMonth()">
-      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-03a</span>
+      <span style="margin-left:14px;font-size:11px;color:#bbb;">ver. 2026-11-12a</span>
     </div>
   </div>
 
@@ -3678,10 +3678,37 @@ function switchDataSection(name) {
   if (name === 'master') renderClassDescForm();
 }
 
-function switchStudio(studio) {
+// URLの ?studio= で使う名前。間違えやすいので、別の綴りも受け付ける。
+const STUDIO_SLUGS = {
+  yakuin: 'yakuin', 'yakuin-studio': 'yakuin', '薬院': 'yakuin',
+  hirao: 'hirao', '平尾': 'hirao',
+  hirao2: 'hirao2', axiom: 'hirao2', akushiomu: 'hirao2',
+  'hirao-axiom': 'hirao2', 'hirao2-axiom': 'hirao2', 'アクシオム': 'hirao2', '平尾2': 'hirao2',
+  takamiya: 'takamiya', '高宮': 'takamiya',
+  online: 'online', 'オンライン': 'online', haishin: 'online',
+};
+
+// URLに出すときの綴り（hirao2 より axiom のほうが分かりやすいので）
+function studioSlug(key) { return key === 'hirao2' ? 'axiom' : key; }
+
+function studioFromUrl() {
+  const raw = (new URLSearchParams(location.search).get('studio') || '').trim();
+  if (!raw) return null;
+  return STUDIO_SLUGS[raw.toLowerCase()] || STUDIO_SLUGS[raw] || null;
+}
+
+function switchStudio(studio, opts) {
+  if (!STUDIOS[studio] && studio !== 'online') return;
   currentStudio = studio;
-  document.querySelectorAll('.studio-tabs button').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('.studio-tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.studio === studio);
+  });
+  // いま見ている店舗がアドレス欄に出るようにする。そのままコピーして配れる。
+  if (!(opts && opts.silent)) {
+    const url = new URL(location.href);
+    url.searchParams.set('studio', studioSlug(studio));
+    history.replaceState(null, '', url);
+  }
   if (calView === 'week') renderSchedule();
   else renderMonthCal();
 }
@@ -4209,6 +4236,16 @@ if (new URLSearchParams(location.search).has('admin')) {
   const editBtn = document.getElementById('edit-tab-btn');
   if (editBtn) editBtn.style.display = '';
 }
+// URLで店舗が指定されていれば、その店舗を開いた状態にしておく
+// 例：?studio=axiom（平尾アクシオム）、?studio=takamiya（高宮）
+(function initStudioFromUrl() {
+  const s = studioFromUrl();
+  if (!s) return;
+  currentStudio = s;
+  document.querySelectorAll('.studio-tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.studio === s);
+  });
+})();
 // 「対象月」（お知らせ欄の見出し用）を常に実際の今月に初期化する
 (function initDefaultMonth() {
   const now = new Date();
